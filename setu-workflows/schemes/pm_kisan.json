@@ -1,0 +1,38 @@
+{
+  "scheme_id": "pm_kisan",
+  "display_name": "PM Kisan Samman Nidhi",
+  "description": "Central sector scheme to provide income support to all landholding farmers' families",
+  "fields": [
+    {
+      "name": "owns_land",
+      "type": "boolean",
+      "prompt": "Do you own agricultural land?"
+    },
+    {
+      "name": "land_size_acres",
+      "type": "number",
+      "prompt": "How many acres of agricultural land do you own?",
+      "depends_on": {
+        "field": "owns_land",
+        "value": true
+      }
+    },
+    {
+      "name": "has_aadhaar_linked_bank",
+      "type": "boolean",
+      "prompt": "Is your bank account linked to Aadhaar?"
+    },
+    {
+      "name": "district",
+      "type": "text",
+      "prompt": "Which district is your land registered in?"
+    },
+    {
+      "name": "full_name",
+      "type": "text",
+      "prompt": "What is your full name as per Aadhaar?"
+    }
+  ],
+  "eligibility_rule": "owns_land == true and land_size_acres <= 2 and has_aadhaar_linked_bank == true",
+  "pdf_template": "pm_kisan.html"
+}
