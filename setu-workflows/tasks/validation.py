@@ -1,7 +1,7 @@
 """Validation task — evaluates scheme eligibility against collected fields.
 
 Reads/writes:
-- Reads: documents_collected (all fields for the instance), schemes/{scheme_id}.json (eligibility rule)
+- Reads: documents_collected (all fields for the instance), schemes/{scheme_id}.json
 - Writes: workflow_instances.current_stage (advances to 'form_generation' or 'notified')
 """
 
@@ -9,12 +9,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from render_workflows import task
+from render_sdk import Workflows
+from render_sdk.workflows import Retry
 
 from supabase_client import get_supabase
 
+validation_app = Workflows()
 
-@task
+
+@validation_app.task(
+    retry=Retry(max_retries=2, wait_duration_ms=1000),
+    timeout_seconds=30,
+)
 def validation_task(workflow_instance_id: str) -> dict[str, Any]:
     """Check eligibility rules against collected document fields.
 
@@ -28,7 +34,6 @@ def validation_task(workflow_instance_id: str) -> dict[str, Any]:
     Returns:
         dict with keys: eligible (bool), failed_reasons (list[str])
     """
-    # TODO (Phase 5): implement per-scheme eligibility check
     supabase = get_supabase()
 
     instance = (
@@ -38,7 +43,6 @@ def validation_task(workflow_instance_id: str) -> dict[str, Any]:
         .single()
         .execute()
     )
-
     scheme_id = instance.data["scheme_id"]
 
     # Read collected fields
@@ -48,11 +52,51 @@ def validation_task(workflow_instance_id: str) -> dict[str, Any]:
         .eq("workflow_instance_id", workflow_instance_id)
         .execute()
     )
-
     collected = {row["field_name"]: row["field_value"] for row in fields.data}
 
-    # TODO: Route to per-scheme validation logic
+    # Route to per-scheme validation
+    if scheme_id == "pm_kisan":
+        result = _validate_pm_kisan(collected)
+    else:
+        result = {"eligible": False, "failed_reasons": [f"Unknown scheme: {scheme_id}"]}
+
+    # Advance stage
+    next_stage = "form_generation" if result["eligible"] else "validation_failed"
+    supabase.table("workflow_instances").update({"current_stage": next_stage}).eq(
+        "id", workflow_instance_id
+    ).execute()
+
+    return result
+
+
+def _validate_pm_kisan(collected: dict[str, Any]) -> dict[str, Any]:
+    """PM Kisan Samman Nidhi eligibility check.
+
+    Rules:
+    - owns_land must be True
+    - land_size_acres must be <= 2 (if owns_land is True)
+    - has_aadhaar_linked_bank must be True
+    """
+    failed_reasons: list[str] = []
+
+    owns_land = collected.get("owns_land")
+    if owns_land is not True:
+        failed_reasons.append("Applicant must own agricultural land.")
+
+    land_size = collected.get("land_size_acres")
+    if owns_land is True:
+        if land_size is None:
+            failed_reasons.append("Land size not provided.")
+        elif land_size > 2:
+            failed_reasons.append(
+                f"Land size ({land_size} acres) exceeds the 2-acre limit."
+            )
+
+    aadhaar_bank = collected.get("has_aadhaar_linked_bank")
+    if aadhaar_bank is not True:
+        failed_reasons.append("Bank account must be linked to Aadhaar.")
+
     return {
-        "eligible": True,
-        "failed_reasons": [],
+        "eligible": len(failed_reasons) == 0,
+        "failed_reasons": failed_reasons,
     }
