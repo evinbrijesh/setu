@@ -1,7 +1,7 @@
 # CLAUDE.md for Setu Project
 
 ## Stack
-- **Frontend**: React + Vite (setu-web/)
+- **Frontend**: React + Vite + Tailwind CSS (setu-web/, plain .jsx files, no TypeScript)
 - **Voice Bridge**: FastAPI WebSocket service (setu-audio/)
 - **STT/TTS/LLM**: Sarvam AI (Saaras v3 STT, Sarvam-30B/105B LLM, Bulbul v3 TTS)
 - **Orchestration**: Render Workflows (Python SDK, setu-workflows/)
@@ -32,16 +32,19 @@ docs/              # Planning docs: PRD, architecture, tech-stack, user-stories,
 - **Config/scheme data**: Load from `schemes/*.json` via a single shared loader function; do not read scheme JSON files ad hoc from multiple places.
 - **Docstrings**: Every Render task function gets a one-paragraph docstring stating inputs, outputs, and Supabase state read/written.
 
-### TypeScript / React (setu-web)
-- **Style**: Prettier (default config) + ESLint with recommended React/TypeScript rule sets.
+### React (setu-web)
+- **Style**: Prettier (default config). ESLint v9 config needed (`eslint.config.js`).
 - **Components**: Functional components only, with hooks. No class components.
 - **Naming**:
-  - Components: `PascalCase.tsx`
-  - Hooks: `useCamelCase.ts`
-  - Non-component modules: `camelCase.ts`
-- **State management**: Local component state (`useState`) for UI-only concerns; Supabase real-time subscriptions or polling for backend state (`documents_collected`, `workflow_instances.current_stage`) – do not duplicate backend state in a separate client-side store.
-- **Styling**: Tailwind utility classes; no inline style objects except for runtime-computed values (e.g., progress-bar width).
-- **Typing**: TypeScript strict mode on; define explicit interfaces rather than reaching for `any`.
+  - Components: `PascalCase.jsx`
+  - Screens: `PascalCase.jsx` (in `src/screens/`)
+  - Non-component modules: `camelCase.js`
+  - hooks: `useCamelCase.js`
+- **State management**: Local component state (`useState`) for UI-only concerns; `App.jsx` holds the screen state machine (`'welcome' | 'chat' | 'complete'`). No external state library. Props flow down from App.
+- **Styling**: Tailwind utility classes only (no inline `style={{}}` objects). Design system tokens defined in `tailwind.config.js` (colors, spacing, typography, border radius). See DESIGN.md for the "Refined Institutionalism" design philosophy.
+- **Screen routing**: State-based via `ScreenContext` (no react-router-dom). Three screens: WelcomeScreen, ChatScreen, CompletionScreen.
+- **WebSocket**: All WS logic lives in `MicButton.jsx` (The Pulse component). Parent passes callbacks for transcript/response/session events.
+- **Icons**: Material Symbols (`material-symbols-outlined` Google font). Use `fontVariationSettings: "'FILL' 1"` for filled variants.
 
 ### Cross-Cutting
 - **Commit messages**: `type(scope): short description` (e.g., `feat(workflows): add validation_task retry policy`).
@@ -56,6 +59,7 @@ docs/              # Planning docs: PRD, architecture, tech-stack, user-stories,
   - Each user utterance triggers a **fresh** Render task run with the existing `workflow_instance_id` and `current_stage`.
   - Tasks read existing Supabase state first to resume into the correct stage, not restart from `intake_task`.
   - Result: many short-lived, fully observable Render runs stitched together by the Supabase row.
+- **Design system source**: The frontend design spec lives in `setu-web/ui_ideas/stitch_setu_voice_government_interface.zip` — contains DESIGN.md (full design system), three code.html screens (welcome, voice interaction, application ready), and screenshots. Re-extract to review if changes are needed.
 - **Do not**:
   - Reintroduce Django/DRF or a hand-rolled state machine (replaced by Render Workflows).
   - Add a Claude API fallback for the reasoning LLM – use Sarvam-30B/105B only.
@@ -65,7 +69,19 @@ docs/              # Planning docs: PRD, architecture, tech-stack, user-stories,
   - Treat low-confidence LLM extraction as a task failure – return a "needs re-ask" signal instead.
 
 ## Module Map
-- **setu-web/**: Frontend UI, microphone capture, WebSocket connection to setu-audio, transcript display, form preview, session status.
+- **setu-web/**: React + Vite frontend with 3-screen state machine.
+  - `src/screens/WelcomeScreen.jsx` — Landing: hero text, The Pulse mic button, suggestion chips (Caste Certificate, PM Kisan, Income Certificate, Ayushman Card). Entry point for new/resumed sessions.
+  - `src/screens/ChatScreen.jsx` — Split-pane: left 2/3 is live assistant chat (scrollable transcript + mic anchored at bottom), right 1/3 is Application Progress card (step indicator, progress bar, field checklist).
+  - `src/screens/CompletionScreen.jsx` — Done state: checkmark icon, scheme summary card, download button, "start another" link.
+  - `src/components/MicButton.jsx` — The Pulse: central circular mic button with concentric pulsing rings (idle: deep indigo glow; recording: red pulse). Holds all WebSocket connection logic (start_session, streaming audio, end_utterance, parsing transcript/response/session_state messages, playing returned audio).
+  - `src/components/TopBar.jsx` — Sticky header with Setu branding, desktop nav links, language toggle.
+  - `src/components/SuggestionChips.jsx` — 4 pill-shaped scheme buttons with Material Symbol icons.
+  - `src/components/ChatMessage.jsx` — Single message bubble (agent left-aligned with border card, user right-aligned with filled primary container).
+  - `src/components/ProgressPanel.jsx` — Right sidebar: step counter, progress bar, FieldItem list showing collected/pending/active fields.
+  - `src/components/FieldItem.jsx` — Single field row: green check + value for completed, spinner for active, dim circle for pending.
+  - `src/components/ScreenContext.jsx` — React context for screen state and setter.
+  - `src/index.css` — Tailwind directives + custom mic pulse keyframes + scrollbar styles.
+  - `tailwind.config.js` — Complete design token set matching DESIGN.md (colors, spacing, typography, border radii, animations).
 - **setu-audio/**: WebSocket endpoint (`/ws/audio`), STT (Saaras v3), TTS (Bulbul v3), REST endpoints for session/form lookup, triggers Render workflow runs.
 - **setu-workflows/**: 
   - `intake_task`: Identifies/confirms scheme intent, creates `workflow_instances` row if needed.
