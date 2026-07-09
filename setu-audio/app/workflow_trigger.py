@@ -7,6 +7,8 @@ For production, POSTs to the Render Workflow trigger URL.
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -22,16 +24,35 @@ _use_direct_call: bool = False
 _direct_module: Any = None
 
 
+def _find_workflows_dir() -> Path | None:
+    """Walk up from setu-audio/ to find the setu-workflows/ directory.
+
+    Searches parent directories for a sibling 'setu-workflows/main.py'.
+    This is more robust than hardcoding a relative path that depends on
+    the uvicorn working directory.
+    """
+    current = Path(__file__).resolve().parent
+    for _ in range(10):  # walk up at most 10 levels
+        candidate = current / "setu-workflows"
+        if (candidate / "main.py").exists():
+            return candidate
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+    return None
+
+
 def _try_import_direct() -> bool:
     """Attempt to import run_setu_turn for direct local calls."""
     global _direct_module, _use_direct_call
     try:
-        import sys
+        workflows_dir = _find_workflows_dir()
+        if workflows_dir is None:
+            print("[workflow_trigger] Could not find setu-workflows/ directory")
+            return False
 
-        sys.path.insert(
-            0,
-            os.path.join(os.path.dirname(__file__), "..", "..", "setu-workflows"),
-        )
+        sys.path.insert(0, str(workflows_dir))
         from main import run_setu_turn  # type: ignore
 
         _direct_module = run_setu_turn

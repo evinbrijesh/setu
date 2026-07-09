@@ -10,7 +10,7 @@ import json
 import os
 from uuid import uuid4
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.audio_utils import transcode_to_wav
@@ -19,10 +19,14 @@ from app.workflow_trigger import trigger_setu_turn
 
 app = FastAPI(title="setu-audio")
 
-# Allow the Vite dev server to connect during local development.
+# CORS: allow Vite dev server (localhost:5173) and any production frontend URL
+# via the CORS_ORIGINS env var (comma-separated list).
+_ALLOWED_ORIGINS = os.environ.get(
+    "CORS_ORIGINS", "http://localhost:5173,http://localhost:4173"
+).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -62,7 +66,54 @@ async def lookup_session(user_id: str, scheme_id: str):
                 }
     except Exception:
         pass
-    return None  # 204 No Content
+    return Response(status_code=204)
+
+
+@app.get("/api/form/{workflow_instance_id}")
+async def get_form_download(workflow_instance_id: str):
+    """Get signed download URL for a generated PDF.
+
+    Reads the workflow_instances table to find the PDF storage path,
+    generates a signed URL from Supabase Storage, and returns it.
+
+    Returns:
+        200: { status: "ready", download_url: "...", expires_at: "..." }
+        200: { status: "pending" } — if PDF not yet generated.
+    """
+    try:
+        from supabase import create_client
+
+        url = os.environ.get("SUPABASE_URL", "")
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        if not url or not key:
+            return {"status": "pending"}
+
+        supabase = create_client(url, key)
+        instance = (
+            supabase.table("workflow_instances")
+            .select("pdf_storage_path, status")
+            .eq("id", workflow_instance_id)
+            .single()
+            .execute()
+        )
+        pdf_path = instance.data.get("pdf_storage_path", "")
+        if not pdf_path:
+            return {"status": "pending"}
+
+        signed = supabase.storage.from_("generated_forms").create_signed_url(
+            pdf_path,
+            expires_in=604800,  # 7 days
+        )
+        download_url = getattr(signed, "signedURL", None) or (
+            signed.get("signedURL", "") if isinstance(signed, dict) else ""
+        )
+        return {
+            "status": "ready",
+            "download_url": download_url,
+            "expires_at": "",  # Supabase doesn't return expiry in a parseable format
+        }
+    except Exception:
+        return {"status": "pending"}
 
 
 @app.websocket("/ws/audio")
@@ -137,6 +188,8 @@ async def audio_websocket(websocket: WebSocket):
                             "complete": result.get("complete", False),
                             "needs_reask": result.get("needs_reask", False),
                             "resumed": result.get("resumed", False),
+                            "download_url": result.get("download_url", ""),
+                            "collected_fields": result.get("collected_fields", {}),
                         }
                     )
 
