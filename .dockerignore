@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Env files
+.env
+.env.local
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+
+# Project-specific excludes
+setu-audio/.ruff_cache/
+setu-audio/.env
+setu-audio/test.wav
+setu-web/ui_ideas/
+setu-web/node_modules/
+setu-workflows/.venv/
+setu-workflows/__pycache__/
+setu-workflows/.ruff_cache/
+setu-workflows/.env

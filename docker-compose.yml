@@ -1,0 +1,45 @@
+# Setu — Docker Compose
+# ======================
+# One-command start:  docker compose up
+# One-command start (detached):  docker compose up -d
+#
+# Before running:
+#   1. Copy .env.example → .env in this directory
+#   2. Fill in your Sarvam API key and Supabase credentials
+#   3. Run: docker compose up
+#
+# Services:
+#   audio  → FastAPI WebSocket bridge (port 8000)
+#   web    → React frontend via nginx (port 80)
+#
+# In local dev mode, setu-audio imports setu-workflows in-process
+# (no Render Workflow API call needed). The audio Docker image
+# bundles both setu-audio/ and setu-workflows/ code.
+
+version: "3.9"
+
+services:
+  audio:
+    build:
+      context: .
+      dockerfile: setu-audio/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file: .env
+    # Default CORS origins for Docker: allow both host machine
+    # localhost and the Docker internal gateway IP (for the web container).
+    environment:
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:4173,http://localhost:80,http://localhost
+
+  web:
+    build:
+      context: .
+      dockerfile: setu-web/Dockerfile
+      args:
+        VITE_AUDIO_WS_URL: ${VITE_AUDIO_WS_URL:-ws://localhost:8000/ws/audio}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    ports:
+      - "80:80"
+    depends_on:
+      - audio
