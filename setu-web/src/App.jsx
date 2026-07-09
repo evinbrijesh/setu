@@ -104,6 +104,9 @@ export default function App() {
     if (state.resumed) {
       setIsResumed(true);
     }
+    if (state.download_url) {
+      setPdfDownloadUrl(state.download_url);
+    }
     if (state.complete === true) {
       setIsComplete(true);
     }
