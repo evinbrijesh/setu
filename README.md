@@ -5,6 +5,22 @@
 
 ---
 
+## ⚡ Quick Start (judge edition)
+
+Choose ONE of these paths:
+
+| If you have... | Command |
+|----------------|---------|
+| **Docker** | `cp .env.example .env` → fill in keys → **`docker compose up`** |
+| **Python + Node + `just`** | `cp .env.example .env` → fill in keys → **`just`** |
+| **Python + Node + `make`** | `cp .env.example .env` → fill in keys → **`make`** |
+
+All three do the same thing: install deps, run the pipeline test (proves Sarvam + Supabase work), and start both services. Full setup instructions below.
+
+> ⚠️ **Before any of these work:** you need a Supabase project (apply `supabase/migrations/001-004`) and real API keys in `.env`. The README below walks through this once; after that, the one-command paths work every time.
+
+---
+
 ## 📌 Problem & Domain
 
 Hundreds of millions of Indians are entitled to government services — certificates, welfare scheme benefits, identity documents — but are functionally locked out of them by process friction: forms written in English or formal bureaucratic language, unclear document requirements, no way to resume an abandoned application, and no help available in the citizen's own spoken language. This friction disproportionately affects people with lower literacy or limited digital fluency, who often resort to paid middlemen for services that should be free and self-serve.
@@ -112,40 +128,148 @@ Setu is a dual-track submission:
 
 ## 🧪 How to Run the Project
 
-### Requirements:
-- Node.js (for `setu-web`)
-- Python 3.11+ (for `setu-audio` and `setu-workflows`)
-- `ffmpeg` installed and available on PATH (required for audio transcoding)
-- A Supabase project (URL + anon key + service-role key)
-- A Sarvam AI API key (with access to Saaras v3, Bulbul v3, and Sarvam-30B/105B)
-- A Render account (for deploying the Workflow service)
+> This project is a **monorepo with 3 services**. You must run all 3 to see the full system work.
+> The quickest path to a working demo: `setu-workflows` test pipeline (proves Sarvam + Supabase work) → `setu-audio` + `setu-web` (proves voice round-trip).
 
-### Local Setup:
+### Prerequisites
+
+| Dependency | Required For | Check with |
+|-----------|-------------|------------|
+| Python 3.11+ | `setu-audio`, `setu-workflows` | `python3 --version` |
+| Node.js 18+ | `setu-web` | `node --version` |
+| `ffmpeg` | Audio transcoding (webm → wav) | `ffmpeg -version` |
+| A Supabase project | Database + Storage | Create at [supabase.com](https://supabase.com) |
+| A Sarvam AI API key | Saaras STT + Bulbul TTS + LLM | Get from [sarvam.ai](https://sarvam.ai) |
+| A Render account | Workflow service deployment | Create at [render.com](https://render.com) |
+
+### Step 0: Clone and prepare config
+
 ```bash
-# 1. Clone the repo
 git clone https://github.com/evinbrijesh/<repo-name>.git
 cd <repo-name>
+```
 
-# 2. Set up setu-audio (voice bridge service)
+Each service has an `.env.example` you must copy and fill in:
+
+```bash
+cp setu-audio/.env.example setu-audio/.env    # edit with your keys
+cp setu-workflows/.env.example setu-workflows/.env  # edit with your keys
+cp setu-web/.env.example setu-web/.env        # edit with your keys
+```
+
+**What goes in each `.env`:**
+
+| File | Variables to fill |
+|------|-------------------|
+| `setu-audio/.env` | `SARVAM_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (Render keys optional until deployment) |
+| `setu-workflows/.env` | `SARVAM_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
+| `setu-web/.env` | `VITE_AUDIO_WS_URL=ws://localhost:8000/ws/audio`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+
+### One-Command Paths (after initial config)
+
+Once `.env` files have real keys and Supabase migrations are applied, start everything with one command:
+
+**Docker** (no Python/Node on host needed):
+```bash
+cp .env.example .env   # fill in ALL keys (single file for Docker)
+docker compose up
+# → setu-web at http://localhost, setu-audio at http://localhost:8000
+```
+
+**`make`** (requires Python + Node on host):
+```bash
+make
+# → installs deps → runs test → starts both services
+```
+
+**`just`** (same, with `just` instead of `make`):
+```bash
+just
+```
+
+### Step 1: Apply Supabase migrations
+
+Open your Supabase project Dashboard → SQL Editor, and run these files **in order**:
+
+1. [`supabase/migrations/001_setu_schema.sql`](./supabase/migrations/001_setu_schema.sql) — core tables (workflow_instances, documents_collected, conversation_log)
+2. [`supabase/migrations/002_fix_constraints.sql`](./supabase/migrations/002_fix_constraints.sql) — unique constraint for idempotent upserts
+3. [`supabase/migrations/003_add_pdf_storage.sql`](./supabase/migrations/003_add_pdf_storage.sql) — pdf_storage_path column
+4. [`supabase/migrations/004_rls_policies.sql`](./supabase/migrations/004_rls_policies.sql) — row-level security
+
+Also create a **private** storage bucket named `generated_forms`:
+- Supabase Dashboard → Storage → Create bucket → Name: `generated_forms` → Public: **off**
+
+### Step 2: Validate the pipeline (fastest first proof)
+
+This runs without starting any server — it calls task functions directly:
+
+```bash
+cd setu-workflows
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python test_pipeline.py
+```
+
+Expected output: a full trace of intake → document_collection (5 turns) → validation → form_generation → notify_user, ending with a signed PDF download URL. This proves Sarvam API + Supabase are wired correctly.
+
+### Step 3: Start the voice bridge (setu-audio)
+
+```bash
+# Terminal 1
 cd setu-audio
-python -m venv venv && source venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # fill in SARVAM_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 uvicorn app.main:app --reload --port 8000
+```
 
-# 3. Set up setu-workflows (Render Workflow tasks)
-cd ../setu-workflows
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # fill in SARVAM_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-# deploy via Render CLI/dashboard, or run locally per Render's local task runner docs
+Verify it's alive: `curl http://localhost:8000/health` → `{"status":"ok"}`
 
-# 4. Set up setu-web (frontend)
-cd ../setu-web
+### Step 4: Start the frontend (setu-web)
+
+```bash
+# Terminal 2
+cd setu-web
 npm install
-cp .env.example .env   # fill in VITE_AUDIO_WS_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
 npm run dev
 ```
+
+Opens at `http://localhost:5173`. Tap the mic and speak (Hindi, Tamil, or Hinglish).
+
+### Architecture Note: How the 3 services fit together
+
+```
+Browser mic → setu-web (React, localhost:5173)
+                 WebSocket (ws://localhost:8000/ws/audio)
+                 ↓
+              setu-audio (FastAPI, port 8000)
+                 → Saaras v3 (STT)
+                 → trigger setu-workflows (direct Python call in local dev)
+                 → Bulbul v3 (TTS)
+                 ↓
+              setu-workflows (Python, called in-process during local dev)
+                 → reads/writes Supabase
+```
+
+In local dev mode, `setu-audio` imports `setu-workflows.main.run_setu_turn` directly (no Render Cloud API needed). For production, `setu-audio` POSTs to the Render Workflow trigger URL instead.
+
+### (Optional) Step 5: Run the resumability test
+
+```bash
+cd setu-workflows
+python test_pipeline.py
+# Test 2 (run_resumability_test) simulates a user who starts, pauses,
+# and returns later — proving multi-day resumability without needing
+# a single long-running task.
+```
+
+### (Optional) Step 6: Deploy to Render
+
+1. Push `setu-workflows/` as a connected GitHub repo to Render as a **Workflow service**
+2. Set the start command to `python main.py` and plan to at least Standard
+3. After deploy, copy the trigger URL from Render Dashboard → Triggers
+4. Set `RENDER_WORKFLOWS_TRIGGER_URL` and `RENDER_API_KEY` in `setu-audio/.env`
+5. Deploy `setu-audio/` as a Render **Web Service** (start: `uvicorn app.main:app --host 0.0.0.0 --port 10000`)
+6. Update `setu-web/.env` → `VITE_AUDIO_WS_URL` to point at the deployed audio service
 
 ---
 
