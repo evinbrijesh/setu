@@ -1,12 +1,15 @@
 """Sarvam LLM client — thin wrapper around Sarvam-30B/105B chat completion API.
 
 Used for structured field extraction from user utterances.
+Uses synchronous httpx calls because Render Workflow tasks are sync
+(calling async from a sync task decorator is not natively supported).
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any
 
 import httpx
@@ -24,7 +27,7 @@ if not SARVAM_API_KEY:
     )
 
 
-async def extract_field(
+def extract_field(
     utterance: str,
     field_name: str,
     field_type: str,
@@ -33,6 +36,9 @@ async def extract_field(
     model: str = "sarvam-30b",
 ) -> dict[str, Any]:
     """Call Sarvam LLM to extract a single field value from user utterance.
+
+    Synchronous — Render Workflow tasks do not natively support async
+    execution, so all LLM calls use sync httpx.
 
     Returns a dict with keys:
         - value: the extracted value (or None if not extractable)
@@ -57,8 +63,8 @@ async def extract_field(
         "Content-Type": "application/json",
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(
+    with httpx.Client(timeout=30.0) as client:
+        response = client.post(
             f"{SARVAM_BASE_URL}/v1/chat/completions",
             headers=headers,
             json=payload,
@@ -134,9 +140,7 @@ def _parse_llm_response(content: str, field_type: str) -> dict[str, Any]:
     # Strip markdown code fences
     cleaned = content.strip()
     if cleaned.startswith("```"):
-        # Remove opening fence (possibly with json tag)
         cleaned = cleaned.split("\n", 1)[-1] if "\n" in cleaned else cleaned[3:]
-        # Remove closing fence
         if cleaned.endswith("```"):
             cleaned = cleaned[:-3].strip()
         elif "```" in cleaned:
@@ -151,8 +155,6 @@ def _parse_llm_response(content: str, field_type: str) -> dict[str, Any]:
         pass
 
     # Try to extract JSON object from the response (handles leading text)
-    import re
-
     json_match = re.search(r'\{.*"value".*\}', cleaned, re.DOTALL)
     if json_match:
         try:

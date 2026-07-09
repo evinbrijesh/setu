@@ -24,6 +24,19 @@ GENERIC_RESUME_PROMPT = (
     " Main aapko agle sawaal se aage badhaunga."
 )
 
+# Sentinel value stored in documents_collected when a field is skipped
+# because its dependency was not met (e.g., land_size_acres skipped because
+# owns_land is false). _get_missing_fields treats this as "collected" so
+# the field is not re-prompted on subsequent turns.
+_DEPENDENCY_SKIPPED = "__dependency_skipped__"
+
+
+def _clean_collected_fields(collected: dict[str, Any]) -> dict[str, Any]:
+    """Filter out sentinel/None values for external reporting."""
+    return {
+        k: v for k, v in collected.items() if v is not None and v != _DEPENDENCY_SKIPPED
+    }
+
 
 def generate_recap_prompt(
     supabase,
@@ -57,6 +70,9 @@ def generate_recap_prompt(
         fname = row["field_name"]
         fval = row["field_value"]
         label = field_defs.get(fname, {}).get("prompt", fname)
+        # Skip dependency-skipped fields (they weren't actually answered)
+        if fval == _DEPENDENCY_SKIPPED:
+            continue
         # Display value in a human-readable way
         if isinstance(fval, bool):
             display = "haan" if fval else "nahin"
@@ -73,7 +89,7 @@ def generate_recap_prompt(
     retry=Retry(max_retries=3, wait_duration_ms=1000, backoff_scaling=1.5),
     timeout_seconds=60,
 )
-async def document_collection_task(
+def document_collection_task(
     workflow_instance_id: str,
     latest_utterance: str | None,
     is_resume: bool = False,
@@ -83,6 +99,9 @@ async def document_collection_task(
     One-pass task — reads current state, tries to extract value for the
     first missing field from the utterance using Sarvam LLM, updates
     documents_collected, and reports what's still needed.
+
+    Synchronous by design — Render Workflow tasks do not natively support
+    async execution, so the Sarvam LLM calls use sync httpx internally.
 
     When is_resume=True and existing collected fields exist, the reask
     prompt is prepended with a recap of what's already been provided.
@@ -122,6 +141,7 @@ async def document_collection_task(
         .execute()
     )
     collected = {row["field_name"]: row["field_value"] for row in fields_result.data}
+    clean_fields = _clean_collected_fields(collected)  # for external reporting
 
     # Load scheme field definitions
     all_field_names = get_scheme_field_names(scheme_id)
@@ -146,6 +166,7 @@ async def document_collection_task(
             "needs_reask": False,
             "reask_prompt": None,
             "extracted": False,
+            "collected_fields": clean_fields,
         }
 
     # No utterance to process — tell caller what's needed
@@ -160,6 +181,7 @@ async def document_collection_task(
             "needs_reask": True,
             "reask_prompt": prompt,
             "extracted": False,
+            "collected_fields": clean_fields,
         }
 
     # Try to extract the first missing field
@@ -171,8 +193,13 @@ async def document_collection_task(
         dep = field_def["depends_on"]
         dep_value = collected.get(dep["field"])
         if dep_value is None or dep_value != dep["value"]:
-            # Record a null placeholder and move on
-            _upsert_field(supabase, workflow_instance_id, next_field, None)
+            # Mark field as dependency-skipped so _get_missing_fields doesn't
+            # keep re-listing it on subsequent turns.
+            _upsert_field(
+                supabase, workflow_instance_id, next_field, _DEPENDENCY_SKIPPED
+            )
+            collected[next_field] = _DEPENDENCY_SKIPPED  # sync local copy
+            clean_fields = _clean_collected_fields(collected)
             # Re-process remaining fields on next turn
             prompt = _get_prompt(scheme_id, missing[1] if len(missing) > 1 else None)
             return {
@@ -181,6 +208,7 @@ async def document_collection_task(
                 "needs_reask": bool(prompt),
                 "reask_prompt": prompt,
                 "extracted": False,
+                "collected_fields": clean_fields,
             }
 
     # Phase 3: Sarvam LLM extraction
@@ -189,7 +217,7 @@ async def document_collection_task(
 
     # Use Sarvam-30B for single-field extraction (lower latency)
     # Use Sarvam-105B for complex/multi-field cases (future enhancement)
-    llm_result = await extract_field(
+    llm_result = extract_field(
         utterance=latest_utterance,
         field_name=next_field,
         field_type=field_type,
@@ -221,10 +249,13 @@ async def document_collection_task(
             "needs_reask": True,
             "reask_prompt": prompt,
             "extracted": False,
+            "collected_fields": clean_fields,
         }
 
     # Success — upsert the extracted value
     _upsert_field(supabase, workflow_instance_id, next_field, extracted_value)
+    collected[next_field] = extracted_value  # sync local copy
+    clean_fields = _clean_collected_fields(collected)
     _log_agent_response(
         supabase,
         workflow_instance_id,
@@ -241,6 +272,7 @@ async def document_collection_task(
             "needs_reask": False,
             "reask_prompt": None,
             "extracted": True,
+            "collected_fields": clean_fields,
         }
 
     next_prompt = _get_prompt(scheme_id, remaining[0])
@@ -250,6 +282,7 @@ async def document_collection_task(
         "needs_reask": True,
         "reask_prompt": next_prompt,
         "extracted": True,
+        "collected_fields": clean_fields,
     }
 
 
@@ -280,10 +313,11 @@ def _get_missing_fields(
     all_field_names: list[str],
     collected: dict[str, Any],
 ) -> list[str]:
-    """Return fields that are still needed (not yet collected or null)."""
+    """Return fields that are still needed (not yet collected or skipped)."""
     missing = []
     for name in all_field_names:
         val = collected.get(name)
+        # None = not yet answered; sentinel = dependency not met (don't ask)
         if val is None:
             missing.append(name)
     return missing

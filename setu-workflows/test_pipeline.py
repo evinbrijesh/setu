@@ -51,6 +51,9 @@ async def run_test_flow():
     if not _check_env():
         sys.exit(1)
 
+    # Note: All task functions are now synchronous. _run_async handles both
+    # sync and async functions for backward compatibility — it detects whether
+    # the returned value is a coroutine and only awaits if needed.
     # Import the decorated TaskCallable objects, then access raw functions via ._func
     from tasks.intake import intake_task as intake_tc
     from tasks.document_collection import document_collection_task as doc_collection_tc

@@ -96,6 +96,8 @@ def run_setu_turn(
         is_resume=is_resume,
     )
 
+    collected_fields = collection_result.get("collected_fields", {})
+
     # If collection is still in progress and needs user input, return early
     if collection_result.get("needs_reask") or not collection_result.get("complete"):
         return {
@@ -106,6 +108,7 @@ def run_setu_turn(
             "needs_reask": collection_result.get("needs_reask", False),
             "reask_prompt": collection_result.get("reask_prompt"),
             "resumed": is_resume,
+            "collected_fields": collected_fields,
         }
 
     # Step 3: Validation — check eligibility
@@ -120,6 +123,7 @@ def run_setu_turn(
             "eligible": False,
             "failed_reasons": validation_result.get("failed_reasons", []),
             "resumed": is_resume,
+            "collected_fields": collected_fields,
         }
 
     # Step 4: Form generation — produce PDF
@@ -144,6 +148,7 @@ def run_setu_turn(
         "resumed": is_resume,
         "notification_message": notify_result.get("message", ""),
         "download_url": notify_result.get("pdf_url", ""),
+        "collected_fields": collected_fields,
     }
 
 
