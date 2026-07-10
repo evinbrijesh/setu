@@ -19,6 +19,7 @@ const WS_URL = import.meta.env.VITE_AUDIO_WS_URL || "ws://localhost:8000/ws/audi
 export default function MicButton({
   isRecording,
   onRecordingChange,
+  onProcessingChange,
   onTranscript,
   onAgentResponse,
   onSessionState,
@@ -68,11 +69,13 @@ export default function MicButton({
     };
 
     ws.onopen = async () => {
-      // Send session start
+      // Send session start — persist user_id across reloads
+      const userId = localStorage.getItem("setu_user_id") || crypto.randomUUID();
+      localStorage.setItem("setu_user_id", userId);
       ws.send(
         JSON.stringify({
           type: "start_session",
-          user_id: localStorage.getItem("setu_user_id") || crypto.randomUUID(),
+          user_id: userId,
           language_code: language,
           ...(workflowInstanceId ? { workflow_instance_id: workflowInstanceId } : {}),
         })
@@ -98,8 +101,9 @@ export default function MicButton({
 
     ws.onerror = () => {
       onRecordingChange(false);
+      onProcessingChange?.(false);
     };
-  }, [language, workflowInstanceId, onRecordingChange, onTranscript, onAgentResponse, onSessionState, onAudioResponse]);
+  }, [language, workflowInstanceId, onRecordingChange, onProcessingChange, onTranscript, onAgentResponse, onSessionState, onAudioResponse]);
 
   const stopRecording = useCallback(() => {
     const mr = mediaRecorderRef.current;
@@ -116,7 +120,8 @@ export default function MicButton({
     }
 
     onRecordingChange(false);
-  }, [language, onRecordingChange]);
+    onProcessingChange?.(true);
+  }, [language, onRecordingChange, onProcessingChange]);
 
   const handleClick = () => {
     if (isRecording) {

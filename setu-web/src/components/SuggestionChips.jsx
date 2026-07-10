@@ -1,27 +1,9 @@
 const CHIPS = [
   {
-    label: "Caste Certificate",
-    icon: "description",
-    scheme: "caste_certificate",
-    hint: "जाति प्रमाण पत्र",
-  },
-  {
     label: "PM Kisan",
     icon: "agriculture",
     scheme: "pm_kisan",
-    hint: "प्रधानमंत्री किसान",
-  },
-  {
-    label: "Income Certificate",
-    icon: "payments",
-    scheme: "income_certificate",
-    hint: "आय प्रमाण पत्र",
-  },
-  {
-    label: "Ayushman Card",
-    icon: "medical_services",
-    scheme: "ayushman",
-    hint: "आयुष्मान कार्ड",
+    hint: "प्रधानमंत्री किसान सम्मान निधि",
   },
 ];
 

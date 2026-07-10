@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ScreenProvider } from "./components/ScreenContext";
 import TopBar from "./components/TopBar";
 import WelcomeScreen from "./screens/WelcomeScreen";
@@ -38,6 +38,9 @@ export default function App() {
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
 
+  // Processing state — true while backend handles STT → LLM → TTS
+  const [isProcessing, setIsProcessing] = useState(false);
+
   // Chat messages
   const [messages, setMessages] = useState([]);
 
@@ -63,12 +66,14 @@ export default function App() {
 
   const handleStartChat = useCallback(
     (schemeId, label) => {
-      setSchemeName(label || schemeId);
+      const name = label || schemeId;
+      setSchemeName(name);
+      localStorage.setItem("setu_scheme_name", name);
       // Add an initial agent greeting message
       setMessages([
         {
           role: "agent",
-          text: `Namaste! I can help you apply for ${label || schemeId}. Tap the mic and tell me about yourself.`,
+          text: `Namaste! I can help you apply for ${name}. Tap the mic and tell me about yourself.`,
         },
       ]);
       setScreen("chat");
@@ -77,27 +82,33 @@ export default function App() {
   );
 
   const handleTranscript = useCallback((text) => {
+    setIsProcessing(false);
     setMessages((prev) => [...prev, { role: "user", text }]);
   }, []);
 
   const handleAgentResponse = useCallback((text) => {
+    setIsProcessing(false);
     setMessages((prev) => [...prev, { role: "agent", text }]);
   }, []);
 
   const handleSessionState = useCallback((state) => {
     if (state.workflow_instance_id) {
       setWorkflowInstanceId(state.workflow_instance_id);
-      // Persist so we can resume across page reloads
       localStorage.setItem("setu_workflow_id", state.workflow_instance_id);
     }
     if (state.current_stage) {
       // Update fields based on collected_fields
       if (state.collected_fields) {
         setFields((prev) =>
-          prev.map((f) => ({
-            ...f,
-            value: state.collected_fields[f.name] ?? f.value,
-          }))
+          prev.map((f) => {
+            const raw = state.collected_fields[f.name];
+            // Never let the backend sentinel leak into the UI
+            if (raw === "__dependency_skipped__") return f;
+            if (raw !== null && raw !== undefined) {
+              return { ...f, value: raw };
+            }
+            return f;
+          })
         );
       }
     }
@@ -109,6 +120,7 @@ export default function App() {
     }
     if (state.complete === true) {
       setIsComplete(true);
+      localStorage.setItem("setu_workflow_complete", "true");
     }
   }, []);
 
@@ -135,14 +147,48 @@ export default function App() {
     setMessages([]);
     setFields(INITIAL_FIELDS);
     localStorage.removeItem("setu_workflow_id");
+    localStorage.removeItem("setu_workflow_complete");
+    localStorage.removeItem("setu_scheme_name");
   }, []);
 
-  // ── Welcome banner user name lookup ──
-  // Check if there's a stored user on mount (simple)
-  useState(() => {
-    const stored = localStorage.getItem("setu_user_name");
-    if (stored) setUserName(stored);
-  });
+  // ── Mount-time restore from localStorage ──
+  // Resumes an in-progress workflow after page reload, or shows
+  // the completion screen if the workflow finished before reload.
+  useEffect(() => {
+    const storedWorkflowId = localStorage.getItem("setu_workflow_id");
+    const storedSchemeName = localStorage.getItem("setu_scheme_name");
+    const wasComplete = localStorage.getItem("setu_workflow_complete") === "true";
+    const storedUserName = localStorage.getItem("setu_user_name");
+
+    if (storedUserName) setUserName(storedUserName);
+
+    if (storedWorkflowId) {
+      setWorkflowInstanceId(storedWorkflowId);
+      if (storedSchemeName) setSchemeName(storedSchemeName);
+
+      if (wasComplete) {
+        // Workflow finished before reload — fetch download URL, show completion
+        import("./lib/api.js").then(({ getFormDownloadUrl }) => {
+          getFormDownloadUrl(storedWorkflowId).then((result) => {
+            if (result.download_url) setPdfDownloadUrl(result.download_url);
+          });
+        });
+        setIsComplete(true);
+        setScreen("complete");
+      } else {
+        // Workflow in progress — resume in chat screen
+        setIsResumed(true);
+        setMessages([
+          {
+            role: "agent",
+            text: "Welcome back! You have an existing application in progress. Tap the mic to continue.",
+          },
+        ]);
+        setScreen("chat");
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <ScreenProvider value={{ screen, setScreen }}>
@@ -154,6 +200,7 @@ export default function App() {
             onStartChat={handleStartChat}
             isRecording={isRecording}
             onRecordingChange={setIsRecording}
+            onProcessingChange={setIsProcessing}
             onTranscript={handleTranscript}
             onAgentResponse={handleAgentResponse}
             onSessionState={handleSessionState}
@@ -170,7 +217,9 @@ export default function App() {
             schemeName={schemeName}
             currentFieldIndex={currentFieldIndex}
             isRecording={isRecording}
+            isProcessing={isProcessing}
             onRecordingChange={setIsRecording}
+            onProcessingChange={setIsProcessing}
             onTranscript={handleTranscript}
             onAgentResponse={handleAgentResponse}
             onSessionState={handleSessionState}

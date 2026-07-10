@@ -6,6 +6,7 @@ export default function WelcomeScreen({
   onStartChat,
   isRecording,
   onRecordingChange,
+  onProcessingChange,
   onTranscript,
   onAgentResponse,
   onSessionState,
@@ -49,6 +50,7 @@ export default function WelcomeScreen({
             <MicButton
               isRecording={isRecording}
               onRecordingChange={onRecordingChange}
+              onProcessingChange={onProcessingChange}
               onTranscript={onTranscript}
               onAgentResponse={onAgentResponse}
               onSessionState={handleSessionState}

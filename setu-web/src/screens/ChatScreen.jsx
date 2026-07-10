@@ -10,7 +10,9 @@ export default function ChatScreen({
   schemeName,
   currentFieldIndex,
   isRecording,
+  isProcessing,
   onRecordingChange,
+  onProcessingChange,
   onTranscript,
   onAgentResponse,
   onSessionState,
@@ -78,7 +80,7 @@ export default function ChatScreen({
 
         {/* Messages */}
         <div className="flex flex-col gap-6 flex-1 overflow-y-auto pb-[120px] pr-2 custom-scrollbar">
-          {messages.length === 0 && (
+          {messages.length === 0 && !isProcessing && (
             <div className="flex-1 flex items-center justify-center">
               <p className="text-body-lg text-on-surface-variant text-center">
                 Tap the mic button below to start speaking.
@@ -88,6 +90,20 @@ export default function ChatScreen({
           {messages.map((msg, idx) => (
             <ChatMessage key={idx} role={msg.role} text={msg.text} />
           ))}
+          {isProcessing && (
+            <div className="flex items-start gap-4">
+              <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-on-primary-container text-[18px]">smart_toy</span>
+              </div>
+              <div className="bg-surface-container-high rounded-2xl rounded-tl-sm px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+              </div>
+            </div>
+          )}
           <div ref={chatEndRef} />
         </div>
 
@@ -97,6 +113,7 @@ export default function ChatScreen({
             <MicButton
               isRecording={isRecording}
               onRecordingChange={onRecordingChange}
+              onProcessingChange={onProcessingChange}
               onTranscript={onTranscript}
               onAgentResponse={onAgentResponse}
               onSessionState={handleSessionState}
