@@ -18,15 +18,11 @@ export default function MicButton({
   const wsRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
-  const recognitionRef = useRef(null);
-  const localTranscriptRef = useRef("");
-  
   const [micStream, setMicStream] = useState(null);
   const level = useAudioLevel(isRecording ? micStream : null);
 
   const startRecording = useCallback(async () => {
     onRecordingChange(true);
-    localTranscriptRef.current = "";
 
     const ws = new WebSocket(WS_URL);
     ws.binaryType = "arraybuffer";
@@ -89,46 +85,6 @@ export default function MicButton({
       };
 
       mediaRecorder.start(250);
-
-      // Start local browser Web Speech Recognition as backup/primary transcriptor
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const rec = new SpeechRecognition();
-        rec.continuous = true;
-        rec.interimResults = true;
-        rec.lang = language;
-
-        rec.onresult = (event) => {
-          let interim = "";
-          let final = "";
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              final += event.results[i][0].transcript;
-            } else {
-              interim += event.results[i][0].transcript;
-            }
-          }
-          const text = final || interim;
-          localTranscriptRef.current = text;
-          onTranscript?.(text, false);
-        };
-
-        rec.onerror = (e) => {
-          console.warn("Local speech recognition warning:", e.error);
-        };
-
-        rec.onend = () => {
-          // Restart if the user is still actively recording
-          if (streamRef.current) {
-            try {
-              rec.start();
-            } catch (_) {}
-          }
-        };
-
-        recognitionRef.current = rec;
-        rec.start();
-      }
     };
 
     ws.onclose = () => {
@@ -145,13 +101,6 @@ export default function MicButton({
     const mr = mediaRecorderRef.current;
     const ws = wsRef.current;
 
-    // Shut down speech recognition
-    if (recognitionRef.current) {
-      recognitionRef.current.onend = null;
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-
     if (mr && mr.state !== "inactive") {
       mr.ondataavailable = null;
       mr.stop();
@@ -164,22 +113,9 @@ export default function MicButton({
     }
     setMicStream(null);
 
-    const transcriptText = localTranscriptRef.current.trim();
-
     if (ws && ws.readyState === WebSocket.OPEN) {
-      if (transcriptText) {
-        // Send final text transcript directly to bypass server STT
-        ws.send(
-          JSON.stringify({
-            type: "text_utterance",
-            text: transcriptText,
-            language_code: language,
-          })
-        );
-      } else {
-        // Fall back to ending the utterance normally (streams audio buffer)
-        ws.send(JSON.stringify({ type: "end_utterance", language_code: language }));
-      }
+      // Send end_utterance to trigger audio transcode and Saaras STT on the server
+      ws.send(JSON.stringify({ type: "end_utterance", language_code: language }));
     }
 
     onRecordingChange(false);

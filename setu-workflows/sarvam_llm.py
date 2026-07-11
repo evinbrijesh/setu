@@ -67,24 +67,31 @@ def extract_field(
                     if content:
                         return _parse_llm_response(content, field_type)
         except Exception as exc:
-            print(f"Sarvam LLM failed: {exc}. Trying Gemini fallback...")
+            print(f"Sarvam LLM failed: {exc}")
+            if os.environ.get("ENABLE_FALLBACKS") != "true":
+                return {
+                    "value": None,
+                    "confidence": 0.0,
+                    "reasoning": f"Sarvam LLM failed: {exc}",
+                }
             pass
 
-    # 2. Try Gemini Fallback
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    if gemini_key:
-        try:
-            gemini_content = _call_gemini_fallback(system_prompt, user_prompt, gemini_key)
-            if gemini_content:
-                return _parse_llm_response(gemini_content, field_type)
-        except Exception as e:
-            print(f"Gemini fallback failed: {e}")
-            pass
+    # 2. Try Gemini Fallback (only if enabled)
+    if os.environ.get("ENABLE_FALLBACKS") == "true":
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+        if gemini_key:
+            try:
+                gemini_content = _call_gemini_fallback(system_prompt, user_prompt, gemini_key)
+                if gemini_content:
+                    return _parse_llm_response(gemini_content, field_type)
+            except Exception as e:
+                print(f"Gemini fallback failed: {e}")
+                pass
 
     return {
         "value": None,
         "confidence": 0.0,
-        "reasoning": "Extraction failed: no API keys available or both LLM models failed.",
+        "reasoning": "Extraction failed: Sarvam LLM failed or was not configured, and fallbacks are disabled.",
     }
 
 

@@ -80,6 +80,9 @@ async def synthesize_speech(
         "model": "bulbul:v3",
     }
 
+    if not SARVAM_API_KEY and os.environ.get("ENABLE_FALLBACKS") != "true":
+        raise RuntimeError("SARVAM_API_KEY is not set and fallbacks are disabled.")
+
     if SARVAM_API_KEY:
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
@@ -88,23 +91,28 @@ async def synthesize_speech(
                     result = response.json()
                     audio_b64 = result["audios"][0]
                     return base64.b64decode(audio_b64)
+                else:
+                    print(f"Sarvam TTS failed with code {response.status_code}: {response.text}")
         except Exception as e:
-            print(f"Sarvam TTS failed: {e}. Falling back to gTTS...")
-            pass
+            print(f"Sarvam TTS connection failed: {e}")
+            if os.environ.get("ENABLE_FALLBACKS") != "true":
+                raise e
 
     # ── gTTS Fallback ──
-    try:
-        from gtts import gTTS
-        import io
-        
-        # Convert e.g., "hi-IN" or "ta-IN" to "hi" / "ta"
-        lang = target_language_code.split("-")[0]
-        tts = gTTS(text=text, lang=lang)
-        fp = io.BytesIO()
-        tts.write_to_fp(fp)
-        fp.seek(0)
-        return fp.read()
-    except Exception as e:
-        print(f"gTTS fallback failed: {e}")
-        # Return empty bytes if all voice synthesis options failed
-        return b""
+    if os.environ.get("ENABLE_FALLBACKS") == "true":
+        try:
+            from gtts import gTTS
+            import io
+            
+            # Convert e.g., "hi-IN" or "ta-IN" to "hi" / "ta"
+            lang = target_language_code.split("-")[0]
+            tts = gTTS(text=text, lang=lang)
+            fp = io.BytesIO()
+            tts.write_to_fp(fp)
+            fp.seek(0)
+            return fp.read()
+        except Exception as e:
+            print(f"gTTS fallback failed: {e}")
+            return b""
+    else:
+        raise RuntimeError("Sarvam TTS failed and fallbacks are disabled.")
