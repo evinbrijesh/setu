@@ -1,0 +1,34 @@
+{
+  "scheme_id": "caste_cert",
+  "display_name": "Caste Certificate",
+  "description": "Official document certifying an individual's caste category for social benefits",
+  "fields": [
+    {
+      "name": "full_name",
+      "type": "text",
+      "prompt": "What is your full name?"
+    },
+    {
+      "name": "state",
+      "type": "text",
+      "prompt": "Which state are you residing in?"
+    },
+    {
+      "name": "caste_category",
+      "type": "text",
+      "prompt": "What is your caste category (e.g. OBC, SC, ST)?"
+    },
+    {
+      "name": "sub_caste",
+      "type": "text",
+      "prompt": "What is your sub-caste name?"
+    },
+    {
+      "name": "annual_family_income",
+      "type": "number",
+      "prompt": "What is your annual family income?"
+    }
+  ],
+  "eligibility_rule": "annual_family_income <= 800000",
+  "pdf_template": "caste_cert.html"
+}

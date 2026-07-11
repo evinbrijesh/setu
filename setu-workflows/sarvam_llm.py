@@ -21,10 +21,7 @@ SARVAM_API_KEY = os.environ.get("SARVAM_API_KEY")
 SARVAM_BASE_URL = "https://api.sarvam.ai"
 
 if not SARVAM_API_KEY:
-    raise RuntimeError(
-        "SARVAM_API_KEY is not set. Check that a .env file with "
-        "SARVAM_API_KEY=<your key> exists."
-    )
+    print("⚠️ WARNING: SARVAM_API_KEY is not set. setu-workflows will fall back to Gemini.")
 
 
 def extract_field(
@@ -37,64 +34,86 @@ def extract_field(
 ) -> dict[str, Any]:
     """Call Sarvam LLM to extract a single field value from user utterance.
 
-    Synchronous — Render Workflow tasks do not natively support async
-    execution, so all LLM calls use sync httpx.
-
-    Returns a dict with keys:
-        - value: the extracted value (or None if not extractable)
-        - confidence: float 0-1
-        - reasoning: brief explanation
+    Fallback: If Sarvam key is missing or calls fail, falls back to Gemini 1.5 Flash.
     """
     system_prompt = _build_system_prompt(field_name, field_type, field_prompt)
     user_prompt = _build_user_prompt(utterance, context)
 
+    # 1. Try Sarvam first
+    if SARVAM_API_KEY:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.1,
+            "max_tokens": 1500,
+        }
+        headers = {
+            "api-subscription-key": SARVAM_API_KEY,
+            "Content-Type": "application/json",
+        }
+        try:
+            with httpx.Client(timeout=15.0) as client:
+                response = client.post(
+                    f"{SARVAM_BASE_URL}/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                )
+                if response.status_code == 200:
+                    result = response.json()
+                    content = result["choices"][0]["message"].get("content")
+                    if content:
+                        return _parse_llm_response(content, field_type)
+        except Exception as exc:
+            print(f"Sarvam LLM failed: {exc}. Trying Gemini fallback...")
+            pass
+
+    # 2. Try Gemini Fallback
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if gemini_key:
+        try:
+            gemini_content = _call_gemini_fallback(system_prompt, user_prompt, gemini_key)
+            if gemini_content:
+                return _parse_llm_response(gemini_content, field_type)
+        except Exception as e:
+            print(f"Gemini fallback failed: {e}")
+            pass
+
+    return {
+        "value": None,
+        "confidence": 0.0,
+        "reasoning": "Extraction failed: no API keys available or both LLM models failed.",
+    }
+
+
+def _call_gemini_fallback(system_prompt: str, user_prompt: str, gemini_key: str) -> str | None:
+    """Call Google AI Studio's Gemini 1.5 Flash in JSON mode."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
     payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "temperature": 0.1,
-        "max_tokens": 1500,
+        "contents": [{
+            "role": "user",
+            "parts": [
+                {"text": f"System Instructions:\n{system_prompt}\n\nUser Input:\n{user_prompt}"}
+            ]
+        }],
+        "generationConfig": {
+            "responseMimeType": "application/json"
+        }
     }
-
-    headers = {
-        "api-subscription-key": SARVAM_API_KEY,
-        "Content-Type": "application/json",
-    }
-
-    with httpx.Client(timeout=30.0) as client:
-        response = client.post(
-            f"{SARVAM_BASE_URL}/v1/chat/completions",
-            headers=headers,
-            json=payload,
-        )
-        result = response.json()
-
-    if response.status_code != 200:
-        return {
-            "value": None,
-            "confidence": 0.0,
-            "reasoning": f"API error {response.status_code}: {result}",
-        }
-
-    if "choices" not in result or not result["choices"]:
-        return {
-            "value": None,
-            "confidence": 0.0,
-            "reasoning": f"Unexpected API response format: {result}",
-        }
-
-    content = result["choices"][0]["message"].get("content")
-    if content is None:
-        finish_reason = result["choices"][0].get("finish_reason", "unknown")
-        return {
-            "value": None,
-            "confidence": 0.0,
-            "reasoning": f"LLM returned no content (finish_reason: {finish_reason}). Full response: {result}",
-        }
-
-    return _parse_llm_response(content, field_type)
+    headers = {"Content-Type": "application/json"}
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            response = client.post(url, headers=headers, json=payload)
+            if response.status_code == 200:
+                res_json = response.json()
+                return res_json["candidates"][0]["content"]["parts"][0]["text"]
+            else:
+                print(f"Gemini API returned code {response.status_code}: {response.text}")
+    except Exception as e:
+        print(f"Gemini HTTP connection failed: {e}")
+    return None
 
 
 def _build_system_prompt(field_name: str, field_type: str, field_prompt: str) -> str:

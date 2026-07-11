@@ -155,6 +155,19 @@ def _infer_scheme(utterance: str) -> str | None:
             "kisaan",
             "pradhan mantri",
         ],
+        "caste_cert": [
+            "caste",
+            "jaati",
+            "jati",
+            "caste certificate",
+            "jaati praman patra",
+        ],
+        "income_cert": [
+            "income",
+            "aay",
+            "income certificate",
+            "aay praman patra",
+        ],
     }
     for scheme_id, words in keywords.items():
         if any(w in lower for w in words):

@@ -1,21 +1,8 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
+import useAudioLevel from "../hooks/useAudioLevel";
 
 const WS_URL = import.meta.env.VITE_AUDIO_WS_URL || "ws://localhost:8000/ws/audio";
 
-/**
- * The Pulse — primary interaction element.
- *
- * Props (controlled by parent for state management):
- *  - isRecording: boolean
- *  - onRecordingChange: (recording: boolean) => void
- *  - onTranscript: (text: string) => void
- *  - onAgentResponse: (text: string) => void
- *  - onSessionState: (state: object) => void
- *  - onAudioResponse: (blob: Blob) => void
- *  - language: string
- *  - workflowInstanceId: string | null
- *  - size: 'sm' | 'lg' (default 'lg')
- */
 export default function MicButton({
   isRecording,
   onRecordingChange,
@@ -30,9 +17,16 @@ export default function MicButton({
 }) {
   const wsRef = useRef(null);
   const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const localTranscriptRef = useRef("");
+  
+  const [micStream, setMicStream] = useState(null);
+  const level = useAudioLevel(isRecording ? micStream : null);
 
   const startRecording = useCallback(async () => {
     onRecordingChange(true);
+    localTranscriptRef.current = "";
 
     const ws = new WebSocket(WS_URL);
     ws.binaryType = "arraybuffer";
@@ -44,7 +38,10 @@ export default function MicButton({
 
         switch (msg.type) {
           case "transcript":
-            onTranscript?.(msg.text, msg.is_final);
+            // Only update if is_final, or if it has text (prevents empty overrides)
+            if (msg.text) {
+              onTranscript?.(msg.text, msg.is_final);
+            }
             break;
           case "agent_response_text":
             onAgentResponse?.(msg.text);
@@ -62,14 +59,12 @@ export default function MicButton({
             break;
         }
       } else {
-        // Binary = synthesized audio
         const blob = new Blob([event.data], { type: "audio/wav" });
         onAudioResponse?.(blob);
       }
     };
 
     ws.onopen = async () => {
-      // Send session start — persist user_id across reloads
       const userId = localStorage.getItem("setu_user_id") || crypto.randomUUID();
       localStorage.setItem("setu_user_id", userId);
       ws.send(
@@ -81,8 +76,9 @@ export default function MicButton({
         })
       );
 
-      // Start mic capture
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      setMicStream(stream);
       const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
       mediaRecorderRef.current = mediaRecorder;
 
@@ -93,6 +89,46 @@ export default function MicButton({
       };
 
       mediaRecorder.start(250);
+
+      // Start local browser Web Speech Recognition as backup/primary transcriptor
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const rec = new SpeechRecognition();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = language;
+
+        rec.onresult = (event) => {
+          let interim = "";
+          let final = "";
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              final += event.results[i][0].transcript;
+            } else {
+              interim += event.results[i][0].transcript;
+            }
+          }
+          const text = final || interim;
+          localTranscriptRef.current = text;
+          onTranscript?.(text, false);
+        };
+
+        rec.onerror = (e) => {
+          console.warn("Local speech recognition warning:", e.error);
+        };
+
+        rec.onend = () => {
+          // Restart if the user is still actively recording
+          if (streamRef.current) {
+            try {
+              rec.start();
+            } catch (_) {}
+          }
+        };
+
+        recognitionRef.current = rec;
+        rec.start();
+      }
     };
 
     ws.onclose = () => {
@@ -109,14 +145,41 @@ export default function MicButton({
     const mr = mediaRecorderRef.current;
     const ws = wsRef.current;
 
+    // Shut down speech recognition
+    if (recognitionRef.current) {
+      recognitionRef.current.onend = null;
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+
     if (mr && mr.state !== "inactive") {
-      mr.ondataavailable = null; // prevent final chunk race
+      mr.ondataavailable = null;
       mr.stop();
       mr.stream.getTracks().forEach((t) => t.stop());
     }
 
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setMicStream(null);
+
+    const transcriptText = localTranscriptRef.current.trim();
+
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "end_utterance", language_code: language }));
+      if (transcriptText) {
+        // Send final text transcript directly to bypass server STT
+        ws.send(
+          JSON.stringify({
+            type: "text_utterance",
+            text: transcriptText,
+            language_code: language,
+          })
+        );
+      } else {
+        // Fall back to ending the utterance normally (streams audio buffer)
+        ws.send(JSON.stringify({ type: "end_utterance", language_code: language }));
+      }
     }
 
     onRecordingChange(false);
@@ -131,68 +194,65 @@ export default function MicButton({
     }
   };
 
-  const iconSize = size === "sm" ? "text-[32px]" : "text-[56px]";
-  const buttonSize = size === "sm" ? "w-20 h-20" : "w-32 h-32";
+  const iconSize = size === "sm" ? "text-[28px]" : "text-[44px]";
+  const buttonSize = size === "sm" ? "w-16 h-16" : "w-24 h-24";
+
+  const ringScale = isRecording ? 1 + level * 0.35 : 1;
+  const ringOpacity = isRecording ? 0.3 + level * 0.5 : 0;
+  
+  const ring2Scale = isRecording ? 1.25 + level * 0.45 : 1;
+  const ring2Opacity = isRecording ? 0.2 + level * 0.35 : 0;
+  
+  const ring3Scale = isRecording ? 1.5 + level * 0.55 : 1;
+  const ring3Opacity = isRecording ? 0.1 + level * 0.2 : 0;
 
   return (
     <div className="relative flex justify-center items-center">
-      {/* Pulsing background rings — only show when idle */}
       {!isRecording && (
-        <>
-          <div
-            className="absolute inset-0 bg-primary-container opacity-10 rounded-full animate-ping-slow"
-            style={{ width: "200%", height: "200%", top: "-50%", left: "-50%" }}
-          />
-          <div
-            className="absolute inset-0 bg-primary-container opacity-20 rounded-full animate-ping-slow"
-            style={{
-              width: "160%",
-              height: "160%",
-              top: "-30%",
-              left: "-30%",
-              animationDelay: "0.5s",
-            }}
-          />
-          <div
-            className="absolute inset-0 bg-primary-container opacity-30 rounded-full animate-ping-slow"
-            style={{
-              width: "130%",
-              height: "130%",
-              top: "-15%",
-              left: "-15%",
-              animationDelay: "1s",
-            }}
-          />
-        </>
+        <div
+          className="absolute inset-0 bg-primary/10 rounded-full animate-pulse blur-xl"
+          style={{ width: "160%", height: "160%", top: "-30%", left: "-30%" }}
+        />
       )}
 
-      {/* Active recording rings */}
       {isRecording && (
         <>
           <div
-            className="absolute inset-0 rounded-full bg-primary-container animate-pulse-ring"
-            style={{ width: "200%", height: "200%", top: "-50%", left: "-50%" }}
+            className="absolute rounded-full ai-glow-ring pointer-events-none"
+            style={{
+              width: "200%",
+              height: "200%",
+              transform: `scale(${ringScale})`,
+              opacity: ringOpacity,
+            }}
           />
           <div
-            className="absolute inset-0 rounded-full bg-primary-container animate-pulse-ring"
+            className="absolute rounded-full ai-glow-ring pointer-events-none"
             style={{
-              width: "160%",
-              height: "160%",
-              top: "-30%",
-              left: "-30%",
-              animationDelay: "0.5s",
+              width: "200%",
+              height: "200%",
+              transform: `scale(${ring2Scale})`,
+              opacity: ring2Opacity,
+            }}
+          />
+          <div
+            className="absolute rounded-full ai-glow-ring pointer-events-none"
+            style={{
+              width: "200%",
+              height: "200%",
+              transform: `scale(${ring3Scale})`,
+              opacity: ring3Opacity,
             }}
           />
         </>
       )}
 
-      {/* The Button */}
       <button
         onClick={handleClick}
-        className={`relative z-10 ${buttonSize} rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-primary-fixed-dim ${
+        className={`relative z-10 ${buttonSize} rounded-full flex items-center justify-center transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary-fixed-dim/30 ${
           isRecording
-            ? "bg-error text-on-error pulse-active"
-            : "bg-primary-container text-on-primary-container pulse-idle"
+            ? "ai-gradient-flow text-white"
+            : "ai-glass-orb-idle text-white"
         }`}
         aria-label={isRecording ? "Stop recording" : "Start voice recording"}
       >

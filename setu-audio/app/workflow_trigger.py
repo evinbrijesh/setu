@@ -91,7 +91,10 @@ async def trigger_setu_turn(
         _try_import_direct()
 
     if _use_direct_call and _direct_module is not None:
-        return _direct_module(
+        # Access the raw Python function via the _func attribute of the TaskCallable
+        # to bypass Render SDK runner context checks when running locally.
+        raw_func = getattr(_direct_module, "_func", _direct_module)
+        return raw_func(
             user_id,
             raw_utterance,
             existing_instance_id=existing_instance_id,

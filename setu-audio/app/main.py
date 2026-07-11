@@ -9,6 +9,8 @@ agent's response via Bulbul v3 TTS, and streams it back.
 import json
 import os
 from uuid import uuid4
+from typing import Any
+from pydantic import BaseModel
 
 from fastapi import FastAPI, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -69,6 +71,42 @@ async def lookup_session(user_id: str, scheme_id: str):
     return Response(status_code=204)
 
 
+MOCK_DATA = {
+    "mock-income-123": {
+        "scheme_id": "income_cert",
+        "template_name": "income_cert.html",
+        "data": {
+            "full_name": "Rajesh Kumar",
+            "district": "Lucknow",
+            "occupation": "Retail Shop Owner",
+            "annual_income": 180000,
+        }
+    },
+    "mock-caste-123": {
+        "scheme_id": "caste_cert",
+        "template_name": "caste_cert.html",
+        "data": {
+            "full_name": "Rajesh Kumar",
+            "state": "Uttar Pradesh",
+            "caste_category": "OBC",
+            "sub_caste": "Yadav",
+            "annual_family_income": 240000,
+        }
+    },
+    "mock-kisan-123": {
+        "scheme_id": "pm_kisan",
+        "template_name": "pm_kisan.html",
+        "data": {
+            "full_name": "Rajesh Kumar",
+            "district": "Lucknow",
+            "owns_land": True,
+            "land_size_acres": 1.5,
+            "has_aadhaar_linked_bank": True,
+        }
+    }
+}
+
+
 @app.get("/api/form/{workflow_instance_id}")
 async def get_form_download(workflow_instance_id: str):
     """Get signed download URL for a generated PDF.
@@ -76,9 +114,8 @@ async def get_form_download(workflow_instance_id: str):
     Reads the workflow_instances table to find the PDF storage path,
     generates a signed URL from Supabase Storage, and returns it.
 
-    Returns:
-        200: { status: "ready", download_url: "...", expires_at: "..." }
-        200: { status: "pending" } — if PDF not yet generated.
+    For mock/demo IDs (e.g. mock-income-123), it compiles the PDF on-the-fly,
+    uploads it to Supabase Storage, and returns a signed download link.
     """
     try:
         from supabase import create_client
@@ -89,6 +126,59 @@ async def get_form_download(workflow_instance_id: str):
             return {"status": "pending"}
 
         supabase = create_client(url, key)
+
+        # ── Mock/Demo ID generation ──
+        if workflow_instance_id.startswith("mock-") or workflow_instance_id in MOCK_DATA:
+            mock_key = workflow_instance_id
+            if mock_key not in MOCK_DATA:
+                mock_key = "mock-income-123"
+            
+            config = MOCK_DATA[mock_key]
+            pdf_path = f"{workflow_instance_id}.pdf"
+            
+            try:
+                from jinja2 import Environment, FileSystemLoader
+                from weasyprint import HTML
+                
+                # Templates directory is adjacent to setu-audio
+                templates_dir = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), "../../setu-workflows/templates")
+                )
+                env = Environment(loader=FileSystemLoader(templates_dir))
+                template = env.get_template(config["template_name"])
+                html = template.render(**config["data"], workflow_instance_id=workflow_instance_id)
+                pdf_bytes = HTML(string=html).write_pdf()
+                
+                # Upload/Overwrite PDF to Supabase Storage
+                try:
+                    supabase.storage.from_("generated_forms").remove([pdf_path])
+                except Exception:
+                    pass
+                
+                supabase.storage.from_("generated_forms").upload(
+                    pdf_path,
+                    pdf_bytes,
+                    {"content-type": "application/pdf"}
+                )
+            except Exception as e:
+                print(f"Error compiling mock PDF on the fly: {e}")
+                pass
+
+            # Once uploaded, request the signed URL
+            signed = supabase.storage.from_("generated_forms").create_signed_url(
+                pdf_path,
+                expires_in=604800,  # 7 days
+            )
+            download_url = getattr(signed, "signedURL", None) or (
+                signed.get("signedURL", "") if isinstance(signed, dict) else ""
+            )
+            return {
+                "status": "ready",
+                "download_url": download_url,
+                "expires_at": "",
+            }
+
+        # ── Real Workflow Instance ──
         instance = (
             supabase.table("workflow_instances")
             .select("pdf_storage_path, status")
@@ -102,7 +192,7 @@ async def get_form_download(workflow_instance_id: str):
 
         signed = supabase.storage.from_("generated_forms").create_signed_url(
             pdf_path,
-            expires_in=604800,  # 7 days
+            expires_in=604800,
         )
         download_url = getattr(signed, "signedURL", None) or (
             signed.get("signedURL", "") if isinstance(signed, dict) else ""
@@ -110,10 +200,152 @@ async def get_form_download(workflow_instance_id: str):
         return {
             "status": "ready",
             "download_url": download_url,
-            "expires_at": "",  # Supabase doesn't return expiry in a parseable format
+            "expires_at": "",
         }
     except Exception:
         return {"status": "pending"}
+
+
+@app.get("/api/history/{user_id}")
+async def get_history(user_id: str):
+    """Look up all workflow instances for a user."""
+    try:
+        from supabase import create_client
+
+        url = os.environ.get("SUPABASE_URL", "")
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        if url and key:
+            supabase = create_client(url, key)
+            result = (
+                supabase.table("workflow_instances")
+                .select("id, scheme_id, current_stage, status, created_at, pdf_storage_path")
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .execute()
+            )
+            return result.data or []
+    except Exception as e:
+        print(f"Error fetching history: {e}")
+    return []
+
+
+@app.get("/api/session/{workflow_instance_id}/messages")
+async def get_session_messages(workflow_instance_id: str):
+    """Fetch the conversation log messages for a given workflow instance."""
+    try:
+        from supabase import create_client
+
+        url = os.environ.get("SUPABASE_URL", "")
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        if url and key:
+            supabase = create_client(url, key)
+            result = (
+                supabase.table("conversation_log")
+                .select("role, text, created_at")
+                .eq("workflow_instance_id", workflow_instance_id)
+                .order("created_at", asc=True)
+                .execute()
+            )
+            raw_msgs = result.data or []
+            
+            # Filter and map messages
+            clean_msgs = []
+            for msg in raw_msgs:
+                text = msg["text"]
+                role = msg["role"]
+                
+                # Filter out system debug logs
+                if role == "agent":
+                    if (text.startswith("LLM extraction for") or 
+                        text.startswith("Got ") or 
+                        text.startswith("[FormGen Error]")):
+                        continue
+                    if text.startswith("[Notification] "):
+                        text = text.replace("[Notification] ", "")
+                
+                clean_msgs.append({
+                    "role": role,
+                    "text": text,
+                    "created_at": msg.get("created_at")
+                })
+            return clean_msgs
+    except Exception as e:
+        print(f"Error fetching session messages: {e}")
+    return []
+
+
+class PrepopulatePayload(BaseModel):
+    user_id: str
+    scheme_id: str
+    fields: dict[str, Any]
+
+
+@app.post("/api/session/prepopulate")
+async def prepopulate_session(payload: PrepopulatePayload):
+    """Prepopulate documents_collected table for simulated OCR upload."""
+    try:
+        from supabase import create_client
+
+        url = os.environ.get("SUPABASE_URL", "")
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        if not url or not key:
+            return {"error": "Supabase credentials missing"}
+
+        supabase = create_client(url, key)
+        
+        # 1. Check or create workflow instance
+        existing = (
+            supabase.table("workflow_instances")
+            .select("id")
+            .eq("user_id", payload.user_id)
+            .eq("scheme_id", payload.scheme_id)
+            .eq("status", "in_progress")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        
+        if existing.data:
+            workflow_id = existing.data[0]["id"]
+        else:
+            workflow_id = str(uuid4())
+            supabase.table("workflow_instances").insert(
+                {
+                    "id": workflow_id,
+                    "user_id": payload.user_id,
+                    "scheme_id": payload.scheme_id,
+                    "current_stage": "document_collection",
+                    "status": "in_progress",
+                }
+            ).execute()
+            
+        # 2. Insert fields into documents_collected
+        for fname, fval in payload.fields.items():
+            supabase.table("documents_collected").upsert(
+                {
+                    "workflow_instance_id": workflow_id,
+                    "field_name": fname,
+                    "field_value": fval,
+                },
+                on_conflict="workflow_instance_id, field_name",
+            ).execute()
+            
+        # 3. Log an agent message
+        supabase.table("conversation_log").insert(
+            {
+                "workflow_instance_id": workflow_id,
+                "role": "agent",
+                "text": f"[OCR Extraction] Successfully analyzed certificate. Pre-populated details in the registry.",
+            }
+        ).execute()
+
+        return {
+            "status": "ok",
+            "workflow_instance_id": workflow_id,
+        }
+    except Exception as e:
+        print(f"Error prepopulating session: {e}")
+        return {"error": str(e)}
 
 
 @app.websocket("/ws/audio")
@@ -149,24 +381,30 @@ async def audio_websocket(websocket: WebSocket):
                     await websocket.send_json(response)
                     continue
 
-                if control.get("type") == "end_utterance":
-                    if not audio_chunks:
-                        await websocket.send_json({"type": "error", "message": "No audio received"})
-                        continue
+                is_text_utterance = control.get("type") == "text_utterance"
 
-                    raw_webm = b"".join(audio_chunks)
-                    audio_chunks = []  # reset buffer for next utterance
+                if control.get("type") == "end_utterance" or is_text_utterance:
+                    if is_text_utterance:
+                        transcript = control.get("text", "")
+                    else:
+                        if not audio_chunks:
+                            await websocket.send_json({"type": "error", "message": "No audio received"})
+                            continue
 
-                    # Step 1: transcode webm -> wav
-                    wav_bytes = await transcode_to_wav(raw_webm)
+                        raw_webm = b"".join(audio_chunks)
+                        audio_chunks = []  # reset buffer for next utterance
 
-                    # Step 2: STT via Saaras v3
-                    transcript = await transcribe_audio(
-                        wav_bytes,
-                        filename="utterance.wav",
-                        language_code=session_language,
-                        mode="codemix",
-                    )
+                        # Step 1: transcode webm -> wav
+                        wav_bytes = await transcode_to_wav(raw_webm)
+
+                        # Step 2: STT via Saaras v3
+                        transcript = await transcribe_audio(
+                            wav_bytes,
+                            filename="utterance.wav",
+                            language_code=session_language,
+                            mode="codemix",
+                        )
+
                     await websocket.send_json(
                         {"type": "transcript", "text": transcript, "is_final": True}
                     )
@@ -195,6 +433,24 @@ async def audio_websocket(websocket: WebSocket):
 
                     # Determine the agent's response text
                     response_text = _build_response_text(result)
+
+                    # Update websocket session reference
+                    session_workflow_instance_id = result.get("workflow_instance_id")
+
+                    # Log user-facing agent response to conversation_log
+                    try:
+                        from supabase import create_client
+                        url = os.environ.get("SUPABASE_URL", "")
+                        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+                        if url and key and session_workflow_instance_id:
+                            supabase = create_client(url, key)
+                            supabase.table("conversation_log").insert({
+                                "workflow_instance_id": session_workflow_instance_id,
+                                "role": "agent",
+                                "text": response_text
+                            }).execute()
+                    except Exception as e:
+                        print(f"Error logging agent response: {e}")
 
                     await websocket.send_json(
                         {"type": "agent_response_text", "text": response_text}

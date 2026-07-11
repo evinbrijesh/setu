@@ -16,10 +16,9 @@ SARVAM_API_KEY = os.environ.get("SARVAM_API_KEY")
 SARVAM_BASE_URL = "https://api.sarvam.ai"
 
 if not SARVAM_API_KEY:
-    raise RuntimeError(
-        "SARVAM_API_KEY is not set. Check that a .env file with "
-        "SARVAM_API_KEY=<your key> exists in the directory you're "
-        "running uvicorn from."
+    print(
+        "⚠️ WARNING: SARVAM_API_KEY is not set. The application will fall back "
+        "to browser Web Speech API for transcription, Gemini for LLM, and gTTS for speech synthesis."
     )
 
 
@@ -32,29 +31,29 @@ async def transcribe_audio(
     """
     Sends audio to Saaras v3 STT REST endpoint, returns transcribed text.
 
-    mode="codemix" is used by default since real Indian speech mixes
-    English words in — codemix output is generally easier for the
-    downstream LLM extraction step to parse than pure native-script
-    transliteration.
+    Fallback: If Sarvam API fails or key is missing, returns empty string.
     """
-    url = f"{SARVAM_BASE_URL}/speech-to-text"
-    headers = {"api-subscription-key": SARVAM_API_KEY}
-    files = {"file": (filename, audio_bytes, "audio/wav")}
-    data = {
-        "model": "saaras:v3",
-        "language_code": language_code,
-        "mode": mode,
-    }
+    if not SARVAM_API_KEY:
+        return ""
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(url, headers=headers, files=files, data=data)
-        response.raise_for_status()
-        result = response.json()
+    try:
+        url = f"{SARVAM_BASE_URL}/speech-to-text"
+        headers = {"api-subscription-key": SARVAM_API_KEY}
+        files = {"file": (filename, audio_bytes, "audio/wav")}
+        data = {
+            "model": "saaras:v3",
+            "language_code": language_code,
+            "mode": mode,
+        }
 
-    # Field name per Sarvam docs is "transcript" — verify against your
-    # actual response the first time you call this, response shapes on
-    # young APIs occasionally shift between doc versions.
-    return result.get("transcript", "")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, headers=headers, files=files, data=data)
+            if response.status_code == 200:
+                result = response.json()
+                return result.get("transcript", "")
+    except Exception as e:
+        print(f"Sarvam STT failed: {e}")
+    return ""
 
 
 async def synthesize_speech(
@@ -65,13 +64,13 @@ async def synthesize_speech(
     """
     Sends text to Bulbul v3 TTS REST endpoint, returns decoded WAV audio
     bytes ready to stream/play. Note: Sarvam's REST response wraps audio
-    as a base64 string inside an `audios` array (supports batching
-    multiple text inputs per request) — always decode, never treat the
-    response body as raw audio bytes directly.
+    as a base64 string inside an `audios` array.
+
+    Fallback: If Sarvam API fails or key is missing, uses the free gTTS library.
     """
     url = f"{SARVAM_BASE_URL}/text-to-speech"
     headers = {
-        "api-subscription-key": SARVAM_API_KEY,
+        "api-subscription-key": SARVAM_API_KEY or "",
         "Content-Type": "application/json",
     }
     payload = {
@@ -81,10 +80,31 @@ async def synthesize_speech(
         "model": "bulbul:v3",
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        result = response.json()
+    if SARVAM_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                if response.status_code == 200:
+                    result = response.json()
+                    audio_b64 = result["audios"][0]
+                    return base64.b64decode(audio_b64)
+        except Exception as e:
+            print(f"Sarvam TTS failed: {e}. Falling back to gTTS...")
+            pass
 
-    audio_b64 = result["audios"][0]
-    return base64.b64decode(audio_b64)
+    # ── gTTS Fallback ──
+    try:
+        from gtts import gTTS
+        import io
+        
+        # Convert e.g., "hi-IN" or "ta-IN" to "hi" / "ta"
+        lang = target_language_code.split("-")[0]
+        tts = gTTS(text=text, lang=lang)
+        fp = io.BytesIO()
+        tts.write_to_fp(fp)
+        fp.seek(0)
+        return fp.read()
+    except Exception as e:
+        print(f"gTTS fallback failed: {e}")
+        # Return empty bytes if all voice synthesis options failed
+        return b""

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Application Form for PM-KISAN Registration</title>
+  <title>Application for Income Certificate</title>
   <style>
     @page {
       size: A4;
@@ -90,7 +90,7 @@
     .form-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 10px;
+      margin-bottom: 15px;
     }
     .form-table th, .form-table td {
       border: 1px solid #000;
@@ -101,33 +101,13 @@
     .form-table th {
       background-color: #fafafa;
       font-weight: bold;
-      width: 30%;
+      width: 35%;
     }
     .value-cell {
       font-family: 'Courier New', Courier, monospace;
       font-size: 11pt;
       font-weight: bold;
       color: #0f172a;
-    }
-    .checkbox-list {
-      margin-top: 5px;
-      padding-left: 15px;
-    }
-    .checkbox-item {
-      margin-bottom: 4px;
-      font-size: 9pt;
-    }
-    .checkbox-box {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border: 1px solid #000;
-      text-align: center;
-      line-height: 12px;
-      font-weight: bold;
-      font-size: 9pt;
-      margin-right: 6px;
-      background-color: #fff;
     }
     .footer-table {
       width: 100%;
@@ -147,7 +127,7 @@
       text-align: center;
       font-size: 8pt;
       color: #888;
-      margin-top: 30px;
+      margin-top: 50px;
       border-top: 1px dashed #ccc;
       padding-top: 5px;
     }
@@ -161,11 +141,11 @@
     <table class="header-table">
       <tr>
         <td class="header-logo">
-          <div class="emblem-stub">GOVT OF<br>INDIA</div>
+          <div class="emblem-stub">REVENUE<br>DEPT</div>
         </td>
         <td class="header-text">
-          <div class="header-title-gov">GOVERNMENT OF INDIA</div>
-          <div class="header-title-dept">DEPARTMENT OF AGRICULTURE & FARMERS WELFARE</div>
+          <div class="header-title-gov">STATE REVENUE ADMINISTRATION</div>
+          <div class="header-title-dept">OFFICE OF THE BLOCK DEVELOPMENT OFFICER / REVENUE TAHSILDAR</div>
         </td>
       </tr>
     </table>
@@ -175,93 +155,57 @@
     </div>
 
     <div class="form-title">
-      APPLICATION FOR NEW FARMER REGISTRATION<br>PRADHAN MANTRI KISAN SAMMAN NIDHI
+      APPLICATION FOR INCOME STATUS CERTIFICATE
     </div>
     <div class="clear"></div>
 
-    <div class="section-title">1. Farmer Personal Profile</div>
+    <div class="section-title">1. Applicant Details</div>
     <table class="form-table">
       <tr>
         <th>Applicant Full Name</th>
         <td class="value-cell">{{ full_name or "____________________________________" }}</td>
       </tr>
       <tr>
-        <th>District / State</th>
-        <td class="value-cell">{{ district or "________________" }} / UTTAR PRADESH</td>
-      </tr>
-      <tr>
-        <th>Category</th>
-        <td class="value-cell">General / OBC</td>
+        <th>District of Residence</th>
+        <td class="value-cell">{{ district or "________________________" }}</td>
       </tr>
     </table>
 
-    <div class="section-title">2. Landholding Details</div>
+    <div class="section-title">2. Occupation & Household Earnings</div>
     <table class="form-table">
       <tr>
-        <th>Owns Cultivable Land</th>
-        <td class="value-cell">
-          <span class="checkbox-box">{{ "✓" if owns_land else " " }}</span> Yes &nbsp;&nbsp;&nbsp;
-          <span class="checkbox-box">{{ " " if owns_land else "✓" }}</span> No
-        </td>
+        <th>Primary Occupation / Profession</th>
+        <td class="value-cell">{{ occupation or "________________________" }}</td>
       </tr>
       <tr>
-        <th>Land Area Owned</th>
-        <td class="value-cell">{{ land_size_acres or "_____" }} Acres</td>
+        <th>Total Annual Household Income (INR)</th>
+        <td class="value-cell">Rs. {{ annual_income or "_______________" }}</td>
       </tr>
     </table>
 
-    <div class="section-title">3. Bank Account & Identity Verification</div>
-    <table class="form-table">
-      <tr>
-        <th>Aadhaar Linked Account</th>
-        <td class="value-cell">
-          <span class="checkbox-box">{{ "✓" if has_aadhaar_linked_bank else " " }}</span> Yes &nbsp;&nbsp;&nbsp;
-          <span class="checkbox-box">{{ " " if has_aadhaar_linked_bank else "✓" }}</span> No
-        </td>
-      </tr>
-      <tr>
-        <th>Primary Identity Type</th>
-        <td class="value-cell">Aadhaar Card (Mandatory Verification Passed)</td>
-      </tr>
-    </table>
-
-    <div class="section-title">4. Exclusion Criteria Self-Declaration</div>
-    <p style="font-size: 8.5pt; margin-top: 5px; margin-bottom: 5px; font-style: italic;">
-      I hereby declare that I or any member of my family DO NOT fall under any of the following exclusion categories:
+    <div class="section-title">3. Self-Declaration</div>
+    <p style="font-size: 9pt; line-height: 1.5; text-align: justify; margin-top: 5px;">
+      I hereby declare that the details regarding my occupation and annual family income stated above are true and reflect my household earnings accurately for the current financial year. I understand that if the declared income is found to be incorrect, the certificate will be nullified, and legal proceedings may be initiated against me.
     </p>
-    <div class="checkbox-list">
-      <div class="checkbox-item">
-        <span class="checkbox-box">✓</span> I am not an institutional landholder.
-      </div>
-      <div class="checkbox-item">
-        <span class="checkbox-box">✓</span> Neither I nor any family member holds constitutional posts.
-      </div>
-      <div class="checkbox-item">
-        <span class="checkbox-box">✓</span> Neither I nor any family member is a retired/serving employee of government offices.
-      </div>
-      <div class="checkbox-item">
-        <span class="checkbox-box">✓</span> I do not pay income tax in the assessment year.
-      </div>
-    </div>
 
     <table class="footer-table">
       <tr>
         <td>
-          <p style="font-size: 8pt; line-height: 1.3; padding-right: 15px;">
+          <p style="font-size: 8pt; line-height: 1.3; padding-right: 15px; color: #444;">
             <strong>Declaration Note:</strong><br>
-            I certify that the landholder details, identity data, and declarations above are true to my knowledge. I understand that any false statements will result in immediate disqualification and recovery actions under the PM-KISAN guidelines.
+            The income assessment has been completed under the block guidelines and verified for public services distribution.
           </p>
         </td>
         <td class="signature-area">
           <div class="signature-line"></div>
-          <div style="font-size: 9pt; font-weight: bold;">Signature / LTI of Farmer</div>
+          <div style="font-size: 9pt; font-weight: bold;">Signature / LTI of Declarant</div>
           <div style="font-size: 8pt; color: #555; margin-top: 2px;">Date: _______________</div>
         </td>
       </tr>
     </table>
 
     <div class="system-footer">
-      Document generated via Setu Voice-First Platform • Reference ID: PMK-{{ workflow_instance_id or "STUB" }}
+      Document generated via Setu Voice-First Platform • Reference ID: INC-{{ workflow_instance_id or "STUB" }}
     </div>
   </div>
 </body>

@@ -16,11 +16,13 @@ User voice → setu-web (React/Vite) → setu-audio (FastAPI, voice bridge)
 ```
 
 ## Repo Structure
-- `setu-web/` — React + Vite frontend (mic capture, transcript, form preview)
-- `setu-audio/` — FastAPI WebSocket service (audio bridge, no business logic)
+- `setu-web/` — React + Vite frontend (mic capture, transcript, form preview, audio-reactive rings)
+- `setu-audio/` — FastAPI WebSocket service (audio bridge, STT/TTS, triggers Render workflows)
 - `setu-workflows/` — Render Workflow service (Python SDK, 5 chained task functions)
-- `schemes/` — JSON config per government scheme + Jinja2 PDF templates
-- `docs/` — planning docs (PRD, architecture, tech-stack, user-stories, api-contract, coding-conventions)
+- `setu-workflows/schemes/` — JSON config per government scheme (currently: pm_kisan)
+- `setu-workflows/templates/` — Jinja2 HTML templates for PDF rendering
+- `supabase/` — SQL migrations (001-004): schema, constraints, storage, RLS
+- `docs/` — planning docs (PRD, architecture, tech-stack, user-stories, api-contract, coding-conventions, ADRs)
 
 ## The Resumability Model (Section 2.3 of architecture.md)
 Render runs cap at 24h with no native scheduling. **Not** modeled as one long task.

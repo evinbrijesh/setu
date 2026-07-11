@@ -1,24 +1,30 @@
 # CLAUDE.md for Setu Project
 
+## What Setu Does
+
+Setu is a voice-first AI agent that helps Indian citizens navigate government bureaucracy — certificates, welfare schemes, identity documents — by speaking in their own language. The user speaks naturally, Setu guides them through a multi-step application process conversationally, tracks progress durably across days, and produces a real, submission-ready filled PDF at the end.
+
 ## Stack
 - **Frontend**: React + Vite + Tailwind CSS (setu-web/, plain .jsx files, no TypeScript)
 - **Voice Bridge**: FastAPI WebSocket service (setu-audio/)
 - **STT/TTS/LLM**: Sarvam AI (Saaras v3 STT, Sarvam-30B/105B LLM, Bulbul v3 TTS)
 - **Orchestration**: Render Workflows (Python SDK, setu-workflows/)
 - **Persistence**: Supabase (PostgreSQL + Storage)
-- **Configuration**: JSON schemes + Jinja2 PDF templates (schemes/)
+- **PDF Generation**: WeasyPrint + Jinja2 templates
+- **Configuration**: JSON scheme configs + Jinja2 PDF templates (setu-workflows/schemes/)
 
 ## Structure
 ```
 setu-web/          # React + Vite frontend: mic capture, transcript, form preview, run status
   src/
+    hooks/         # Custom hooks (useAudioLevel.js — real-time mic amplitude for reactive UI)
     lib/           # supabase.js (anon client), api.js (REST helpers)
 setu-audio/        # FastAPI WebSocket service: audio bridge, STT/TTS, triggers Render workflows
 setu-workflows/    # Render Workflow service: 5 chained Python tasks (intake → document_collection → validation → form_generation → notify_user)
   schemes/         # JSON config per government scheme (pm_kisan.json)
   templates/       # Jinja2 HTML templates for PDF rendering (pm_kisan.html)
 supabase/          # SQL migrations (001-004)
-docs/              # Planning docs: PRD, architecture, tech-stack, user-stories, api-contract, coding-conventions
+docs/              # Planning docs + ADRs: PRD, architecture, tech-stack, user-stories, api-contract, coding-conventions
 ```
 
 ## One-Command Dev Start
@@ -27,6 +33,59 @@ docs/              # Planning docs: PRD, architecture, tech-stack, user-stories,
 - **`docker compose up`** — containerized: no Python/Node on host needed
 - First-time setup: copy `.env.example → .env` in each service (or root `.env` for Docker), apply Supabase migrations (001-004).
 - See `Makefile`, `justfile`, `docker-compose.yml` for details.
+
+## Schemes & Documents
+
+Setu helps citizens complete **government scheme applications and certificate requests**. Each scheme is fully config-driven — adding a new one requires only a JSON config file + PDF template, zero new orchestration code.
+
+### Currently Supported
+
+| Scheme ID | Display Name | What It Does | Fields Collected |
+|-----------|-------------|-------------|-----------------|
+| `pm_kisan` | PM Kisan Samman Nidhi | Income support for farmers (₹6,000/year) | owns_land, land_size_acres, has_aadhaar_linked_bank, district, full_name |
+
+**Eligibility rule (pm_kisan):** owns agricultural land, land ≤ 2 acres, bank linked to Aadhaar.
+
+### Planned / Stretch Schemes (Phase 7+)
+These are documented in `docs/roadmap.md` and `docs/user-stories.md` but not yet implemented:
+- **Caste certificate** — community/category verification for reserved-category benefits
+- **Income certificate** — annual income declaration for means-tested schemes
+- **Domicile certificate** — state residency proof for state-specific schemes
+- **Ration card** — household food-subsidy entitlement
+- **Ayushman Bharat (PMJAY)** — health insurance for Below Poverty Line families
+
+To add a new scheme:
+1. Create `setu-workflows/schemes/<scheme_id>.json` with fields, prompts, eligibility rule, and PDF template name.
+2. Create `setu-workflows/templates/<template>.html` — Jinja2 template for the filled form.
+3. Add a `<scheme_id>` key to `intake_task._infer_scheme()` keyword map in `setu-workflows/tasks/intake.py`.
+4. Add a chip to `setu-web/src/components/SuggestionChips.jsx`.
+5. No changes to any task function or orchestration code.
+
+## Language Support
+
+Setu is multilingual by design — the voice pipeline (Saaras v3 STT → Sarvam LLM → Bulbul v3 TTS) supports code-mixed Indian speech natively.
+
+### Supported Languages
+
+| Code | Language | Notes |
+|------|----------|-------|
+| `hi-IN` | Hindi | Default. Full support across STT, LLM, TTS. |
+| `ta-IN` | Tamil | Supported by Saaras v3 and Bulbul v3. |
+| `en` | English | LLM handles extraction; STT/TTS support varies. |
+
+**Hinglish** (Hindi-English code-mix) is supported natively via Saaras v3's `codemix` mode — no special config needed. The STT outputs Roman-script mixed text that the Sarvam LLM handles well.
+
+### How Language Flows Through the System
+1. User selects language in `TopBar.jsx` → stored as `language` state in `App.jsx`.
+2. Language code is passed to `MicButton` → sent as `language_code` in the WebSocket `start_session` message.
+3. `setu-audio` passes `language_code` to `transcribe_audio()` (Saaras v3 STT) and `synthesize_speech()` (Bulbul v3 TTS).
+4. The LLM extraction step (`sarvam_llm.py`) is language-agnostic — it receives transcribed text in whatever script Saaras outputs.
+5. Scheme prompts in `schemes/*.json` are currently English; the LLM translates them to the user's language at extraction time.
+
+### Adding a New Language
+1. Verify the language code is supported by Saaras v3 STT and Bulbul v3 TTS (check Sarvam docs).
+2. Add the language code + display label to `TopBar.jsx` `LanguageButton.labels` map.
+3. No backend changes needed — the language code is passed through dynamically.
 
 ## Conventions
 ### Python (setu-audio, setu-workflows)
@@ -49,11 +108,12 @@ docs/              # Planning docs: PRD, architecture, tech-stack, user-stories,
   - Components: `PascalCase.jsx`
   - Screens: `PascalCase.jsx` (in `src/screens/`)
   - Non-component modules: `camelCase.js`
-  - hooks: `useCamelCase.js`
+  - hooks: `useCamelCase.js` (in `src/hooks/`)
 - **State management**: Local component state (`useState`) for UI-only concerns; `App.jsx` holds the screen state machine (`'welcome' | 'chat' | 'complete'`). No external state library. Props flow down from App.
-- **Styling**: Tailwind utility classes only (no inline `style={{}}` objects). Design system tokens defined in `tailwind.config.js` (colors, spacing, typography, border radius).
+- **Styling**: Tailwind utility classes only (no inline `style={{}}` objects except for runtime-computed values like audio-reactive ring scale/opacity). Design system tokens defined in `tailwind.config.js` (colors, spacing, typography, border radius, keyframes).
 - **Screen routing**: State-based via `ScreenContext` (no react-router-dom). Three screens: WelcomeScreen, ChatScreen, CompletionScreen.
 - **WebSocket**: All WS logic lives in `MicButton.jsx` (The Pulse component). Parent passes callbacks for transcript/response/session events.
+- **Audio visualization**: `useAudioLevel` hook uses Web Audio API (`AnalyserNode`) to return real-time mic amplitude (0–1). Used by MicButton to drive reactive ring scale/opacity. The MediaStream is created on mic open, passed to the hook, and cleaned up on mic close.
 - **REST API**: `src/lib/api.js` provides `lookupSession()` and `getFormDownloadUrl()` for setu-audio HTTP endpoints.
 - **Icons**: Material Symbols (`material-symbols-outlined` Google font). Use `fontVariationSettings: "'FILL' 1"` for filled variants.
 
@@ -90,31 +150,53 @@ docs/              # Planning docs: PRD, architecture, tech-stack, user-stories,
   - `src/screens/WelcomeScreen.jsx` — Landing: hero text, The Pulse mic button, suggestion chips.
   - `src/screens/ChatScreen.jsx` — Split-pane: left 2/3 is live assistant chat, right 1/3 is Application Progress.
   - `src/screens/CompletionScreen.jsx` — Done state: checkmark, download button, "start another" link.
-  - `src/components/MicButton.jsx` — The Pulse: WebSocket connection, mic capture, transcript/response routing.
-  - `src/components/TopBar.jsx` — Sticky header with branding, nav, language toggle.
-  - `src/components/SuggestionChips.jsx` — 4 pill-shaped scheme buttons.
+  - `src/components/MicButton.jsx` — The Pulse: WebSocket connection, mic capture, reactive audio-level rings, transcript/response routing.
+  - `src/components/TopBar.jsx` — Sticky header with branding, nav, language toggle (hi-IN / ta-IN / en).
+  - `src/components/SuggestionChips.jsx` — Pill-shaped scheme buttons (currently: PM Kisan).
   - `src/components/ChatMessage.jsx` — Message bubble component.
   - `src/components/ProgressPanel.jsx` — Right sidebar: progress bar + field checklist.
   - `src/components/FieldItem.jsx` — Single field row (collected/active/pending states).
-  - `src/components/ScreenContext.jsx` — React context for screen routing.
+  - `src/components/ScreenContext.jsx` — React context for screen routing (no react-router-dom).
+  - `src/components/ErrorBoundary.jsx` — React error boundary for crash recovery.
+  - `src/hooks/useAudioLevel.js` — Web Audio API hook: real-time mic amplitude (0–1) via AnalyserNode, drives reactive ring animation.
   - `src/lib/supabase.js` — Supabase anon client initialization.
   - `src/lib/api.js` — REST helpers for session lookup + form download.
 - **setu-audio/**: WebSocket endpoint (`/ws/audio`), STT (Saaras v3), TTS (Bulbul v3), REST endpoints:
-  - `GET /api/session/{user_id}/{scheme_id}` — find existing in_progress instance (204 if none)
-  - `GET /api/form/{workflow_instance_id}` — get signed PDF download URL
+  - `app/main.py` — FastAPI app: WebSocket handler, REST endpoints, CORS config.
+  - `app/sarvam_client.py` — Async wrappers for Saaras v3 STT and Bulbul v3 TTS (batch REST, not streaming).
+  - `app/audio_utils.py` — ffmpeg transcoding (webm → 16kHz mono WAV via subprocess pipes).
+  - `app/workflow_trigger.py` — Routes to Render API (production) or direct Python import (local dev).
+  - `app/test_main.py` — Smoke tests for the WebSocket + REST endpoints.
+  - `GET /api/session/{user_id}/{scheme_id}` — find existing in_progress instance (204 if none).
+  - `GET /api/form/{workflow_instance_id}` — get signed PDF download URL.
   - Triggers Render Workflow runs per utterance.
 - **setu-workflows/**:
-  - `intake_task`: Identifies/confirms scheme intent, creates/resumes `workflow_instances` row.
-  - `document_collection_task`: Sync; extracts structured fields via Sarvam LLM, updates `documents_collected`.
-  - `validation_task`: Evaluates scheme eligibility rule against collected fields.
-  - `form_generation_task`: Renders Jinja2 template → WeasyPrint PDF → Supabase Storage upload.
-  - `notify_user_task`: Generates signed URL + confirmation message, marks workflow completed.
-  - `sarvam_llm.py`: Sync Sarvam-30B/105B chat completion wrapper for field extraction.
-  - `scheme_loader.py`: Shared JSON config loader with cache.
-  - `supabase_client.py`: Singleton Supabase admin client (service-role key).
-- **schemes/**: JSON files defining scheme fields, prompts, eligibility rules, and PDF template names.
+  - `main.py` — Orchestrator: chains intake → document_collection → validation → form_generation → notify. Entry point for Render Workflow worker.
+  - `tasks/intake.py` — `intake_task`: identifies/confirms scheme intent, creates/resumes `workflow_instances` row.
+  - `tasks/document_collection.py` — `document_collection_task`: extracts structured fields via Sarvam LLM, updates `documents_collected`. Handles dependency-skipped fields, resume recap prompts.
+  - `tasks/validation.py` — `validation_task`: evaluates scheme eligibility rule against collected fields.
+  - `tasks/form_generation.py` — `form_generation_task`: renders Jinja2 template → WeasyPrint PDF → Supabase Storage upload.
+  - `tasks/notify.py` — `notify_user_task`: generates signed URL + confirmation message, marks workflow completed.
+  - `sarvam_llm.py` — Sync Sarvam-30B/105B chat completion wrapper for field extraction (uses `httpx.Client`, not async).
+  - `scheme_loader.py` — Shared JSON config loader with in-memory cache.
+  - `supabase_client.py` — Singleton Supabase admin client (service-role key).
+  - `test_pipeline.py` — End-to-end pipeline test (runs without server, calls task functions directly).
+- **setu-workflows/schemes/**: JSON files defining scheme fields, prompts, eligibility rules, and PDF template names.
+  - `pm_kisan.json` — PM Kisan Samman Nidhi: 5 fields (owns_land, land_size_acres, has_aadhaar_linked_bank, district, full_name).
+- **setu-workflows/templates/**: Jinja2 HTML templates for PDF rendering.
+  - `pm_kisan.html` — PM Kisan application form template.
 - **supabase/migrations/**:
   - `001_setu_schema.sql` — Core tables: workflow_instances, documents_collected, conversation_log.
   - `002_fix_constraints.sql` — Unique constraint on (workflow_instance_id, field_name).
   - `003_add_pdf_storage.sql` — pdf_storage_path column on workflow_instances.
   - `004_rls_policies.sql` — Row-level security for all tables (anon key access scoped to auth.uid()).
+- **docs/**:
+  - `prd.md` — Product requirements: problem statement, goals, non-goals, target users, success metrics.
+  - `architecture.md` — Technical design: system overview, resumability model, data model, error handling, security.
+  - `api-contract.md` — WebSocket contract, REST endpoints, task signatures, DB schema, scheme config schema.
+  - `coding-conventions.md` — Style guide for Python, TypeScript/React, cross-cutting conventions.
+  - `roadmap.md` — 8-phase build plan with success criteria and timeline.
+  - `user-stories.md` — User stories for each workflow stage.
+  - `tech-stack-decisions.md` — Rationale for each tech choice.
+  - `abstract.md` — Project abstract / summary.
+  - `adr/` — Architecture Decision Records (6 ADRs covering Sarvam, Render, Supabase, resumability, monorepo, config-driven schemes).

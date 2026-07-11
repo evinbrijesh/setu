@@ -1,0 +1,29 @@
+{
+  "scheme_id": "income_cert",
+  "display_name": "Income Certificate",
+  "description": "Official declaration of annual household income issued by the state revenue department",
+  "fields": [
+    {
+      "name": "full_name",
+      "type": "text",
+      "prompt": "What is your full name?"
+    },
+    {
+      "name": "district",
+      "type": "text",
+      "prompt": "Which district is your residence located in?"
+    },
+    {
+      "name": "occupation",
+      "type": "text",
+      "prompt": "What is your occupation or profession?"
+    },
+    {
+      "name": "annual_income",
+      "type": "number",
+      "prompt": "What is your annual income?"
+    }
+  ],
+  "eligibility_rule": "annual_income > 0",
+  "pdf_template": "income_cert.html"
+}

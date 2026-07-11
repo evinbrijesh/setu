@@ -57,6 +57,10 @@ def validation_task(workflow_instance_id: str) -> dict[str, Any]:
     # Route to per-scheme validation
     if scheme_id == "pm_kisan":
         result = _validate_pm_kisan(collected)
+    elif scheme_id == "caste_cert":
+        result = _validate_caste_cert(collected)
+    elif scheme_id == "income_cert":
+        result = _validate_income_cert(collected)
     else:
         result = {"eligible": False, "failed_reasons": [f"Unknown scheme: {scheme_id}"]}
 
@@ -95,6 +99,56 @@ def _validate_pm_kisan(collected: dict[str, Any]) -> dict[str, Any]:
     aadhaar_bank = collected.get("has_aadhaar_linked_bank")
     if aadhaar_bank is not True:
         failed_reasons.append("Bank account must be linked to Aadhaar.")
+
+    return {
+        "eligible": len(failed_reasons) == 0,
+        "failed_reasons": failed_reasons,
+    }
+
+
+def _validate_caste_cert(collected: dict[str, Any]) -> dict[str, Any]:
+    """Caste Certificate eligibility check.
+
+    Rules:
+    - annual_family_income must be <= 800,000 INR (Creamy Layer limit)
+    """
+    failed_reasons: list[str] = []
+    
+    income = collected.get("annual_family_income")
+    if income is not None:
+        try:
+            val = float(income)
+            if val > 800000:
+                failed_reasons.append(
+                    f"Annual family income ({val} INR) exceeds the 8 Lakhs Creamy Layer limit."
+                )
+        except (ValueError, TypeError):
+            pass
+
+    return {
+        "eligible": len(failed_reasons) == 0,
+        "failed_reasons": failed_reasons,
+    }
+
+
+def _validate_income_cert(collected: dict[str, Any]) -> dict[str, Any]:
+    """Income Certificate eligibility check.
+
+    Rules:
+    - annual_income must be greater than 0.
+    """
+    failed_reasons: list[str] = []
+    
+    income = collected.get("annual_income")
+    if income is not None:
+        try:
+            val = float(income)
+            if val <= 0:
+                failed_reasons.append("Annual income must be greater than 0.")
+        except (ValueError, TypeError):
+            pass
+    else:
+        failed_reasons.append("Annual income is required.")
 
     return {
         "eligible": len(failed_reasons) == 0,
