@@ -77,8 +77,16 @@ def run_setu_turn(
             workflow_instance_id, scheme_id, current_stage, complete,
             needs_reask, reask_prompt, resumed
     """
+    # Helper to call task raw function if not in Render execution context
+    def _call(task_callable, *args, **kwargs):
+        from render_sdk.workflows.task import _current_client
+        if _current_client.get(None) is None:
+            return task_callable._func(*args, **kwargs)
+        return task_callable(*args, **kwargs)
+
     # Step 1: Intake — identify scheme, get or create workflow instance
-    instance = intake_task(
+    instance = _call(
+        intake_task,
         user_id,
         raw_utterance,
         scheme_id=None,
@@ -90,7 +98,8 @@ def run_setu_turn(
     is_resume = instance.get("resumed", False)
 
     # Step 2: Document collection — extract field data
-    collection_result = document_collection_task(
+    collection_result = _call(
+        document_collection_task,
         workflow_id,
         raw_utterance,
         is_resume=is_resume,
@@ -112,7 +121,7 @@ def run_setu_turn(
         }
 
     # Step 3: Validation — check eligibility
-    validation_result = validation_task(workflow_id)
+    validation_result = _call(validation_task, workflow_id)
 
     if not validation_result.get("eligible", False):
         return {
@@ -127,11 +136,12 @@ def run_setu_turn(
         }
 
     # Step 4: Form generation — produce PDF
-    form_result = form_generation_task(workflow_id)
+    form_result = _call(form_generation_task, workflow_id)
     pdf_storage_path = form_result.get("pdf_storage_path")
 
     # Step 5: Notify — send confirmation (pass storage path from form generation)
-    notify_result = notify_user_task(
+    notify_result = _call(
+        notify_user_task,
         workflow_id,
         channel="voice",
         pdf_storage_path=pdf_storage_path,
