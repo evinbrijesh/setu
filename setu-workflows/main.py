@@ -126,6 +126,18 @@ def run_setu_turn(
     validation_result = _call(validation_task, workflow_id)
 
     if not validation_result.get("eligible", False):
+        # Update the workflow instance status to 'completed' in Supabase
+        # so that it is no longer marked as 'in_progress', allowing the user
+        # to start a new application for this scheme.
+        from supabase_client import get_supabase
+        try:
+            supabase = get_supabase()
+            supabase.table("workflow_instances").update(
+                {"status": "completed", "current_stage": "validation_failed"}
+            ).eq("id", workflow_id).execute()
+        except Exception as e:
+            print(f"Failed to update workflow instance status on validation failure: {e}")
+
         return {
             "workflow_instance_id": workflow_id,
             "scheme_id": scheme_id,
