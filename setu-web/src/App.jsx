@@ -382,7 +382,28 @@ export default function App() {
         // Workflow in progress — resume in chat screen
         setIsResumed(true);
         
-        // Fetch conversation history from backend messages log
+        // 1. Fetch already collected fields from Supabase to prevent empty checklist/form preview on reload
+        import("./lib/supabase.js").then(({ supabase }) => {
+          supabase
+            .from("documents_collected")
+            .select("field_name, field_value")
+            .eq("workflow_instance_id", storedWorkflowId)
+            .then(({ data, error }) => {
+              if (data && !error) {
+                setFields((prev) =>
+                  prev.map((f) => {
+                    const match = data.find((row) => row.field_name === f.name);
+                    if (match && match.field_value !== "__dependency_skipped__" && match.field_value !== null) {
+                      return { ...f, value: match.field_value };
+                    }
+                    return f;
+                  })
+                );
+              }
+            });
+        });
+        
+        // 2. Fetch conversation history from backend messages log
         const audioBaseUrl = (() => {
           const wsUrl = import.meta.env.VITE_AUDIO_WS_URL || "ws://localhost:8000/ws/audio";
           return wsUrl.replace(/^ws/, "http").replace(/\/ws\/audio$/, "");
