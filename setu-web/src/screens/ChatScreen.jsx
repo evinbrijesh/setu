@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import MicButton from "../components/MicButton";
 import ChatMessage from "../components/ChatMessage";
 import ProgressPanel from "../components/ProgressPanel";
@@ -27,6 +27,7 @@ export default function ChatScreen({
 }) {
   const { setScreen } = useLocation();
   const chatEndRef = useRef(null);
+  const [inputText, setInputText] = useState("");
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -47,6 +48,62 @@ export default function ChatScreen({
       onComplete?.();
       setScreen("complete");
     }
+  };
+
+  const handleSendText = () => {
+    if (!inputText.trim()) return;
+
+    const textToSend = inputText.trim();
+    setInputText("");
+    
+    onProcessingChange?.(true);
+    // Add user message locally
+    onTranscript?.(textToSend, true);
+
+    const WS_URL = import.meta.env.VITE_AUDIO_WS_URL || "ws://localhost:8000/ws/audio";
+    const ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+      const userId = localStorage.getItem("setu_user_id") || crypto.randomUUID();
+      localStorage.setItem("setu_user_id", userId);
+      
+      ws.send(JSON.stringify({
+        type: "start_session",
+        user_id: userId,
+        language_code: language,
+        ...(workflowInstanceId ? { workflow_instance_id: workflowInstanceId } : {})
+      }));
+
+      ws.send(JSON.stringify({
+        type: "text_utterance",
+        text: textToSend,
+        language_code: language
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      if (typeof event.data === "string") {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "agent_response_text") {
+          onAgentResponse?.(msg.text);
+        } else if (msg.type === "session_state") {
+          handleSessionState(msg);
+        }
+      } else {
+        const blob = new Blob([event.data], { type: "audio/wav" });
+        onAudioResponse?.(blob);
+        ws.close();
+      }
+    };
+
+    ws.onerror = (err) => {
+      console.error("Text websocket error:", err);
+      onProcessingChange?.(false);
+    };
+
+    ws.onclose = () => {
+      onProcessingChange?.(false);
+    };
   };
 
   const showResumeBanner = isResumed && messages.length <= 1;
@@ -85,14 +142,14 @@ export default function ChatScreen({
         </div>
 
         {/* Messages List Area */}
-        <div className="flex flex-col gap-8 flex-grow overflow-y-auto pb-[140px] pr-2 custom-scrollbar">
+        <div className="flex flex-col gap-8 flex-grow overflow-y-auto pb-[90px] pr-2 custom-scrollbar">
           {showResumeBanner && (
             <div className="bg-surface-container-high border border-primary-fixed rounded-xl p-4 shrink-0 text-center shadow-sm">
               <p className="text-body-md text-primary font-semibold">
                 Welcome back! Resuming your application context.
               </p>
               <p className="text-body-md text-on-surface-variant mt-1">
-                Tap the mic to continue where you left off.
+                Use the mic or type below to continue where you left off.
               </p>
             </div>
           )}
@@ -100,7 +157,7 @@ export default function ChatScreen({
           {messages.length === 0 && !isProcessing && (
             <div className="flex-1 flex items-center justify-center">
               <p className="text-body-lg text-on-surface-variant text-center font-medium opacity-80">
-                Tap the mic button below to start speaking.
+                Tap the mic to speak, or type your message below.
               </p>
             </div>
           )}
@@ -121,9 +178,38 @@ export default function ChatScreen({
           <div ref={chatEndRef} />
         </div>
 
-        {/* Floating Centered Mic Button */}
-        <div className="absolute bottom-8 left-0 w-full flex justify-center shrink-0 pointer-events-none z-20">
-          <div className="pointer-events-auto">
+        {/* Unified Glassmorphic Floating Input Dock */}
+        <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur-md border border-surface-variant/40 rounded-full py-2 pl-6 pr-2.5 flex items-center gap-4 shadow-[0_8px_32px_rgba(0,35,111,0.08)] z-20">
+          <input
+            type="text"
+            placeholder={
+              language === "hi-IN"
+                ? "यहाँ टाइप करें या विवरण प्रदान करें..."
+                : language === "ta-IN"
+                ? "இங்கே தட்டச்சு செய்து பதிலளிக்கவும்..."
+                : "Type details or answers here..."
+            }
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSendText();
+            }}
+            disabled={isRecording || isProcessing}
+            className="flex-1 bg-transparent text-on-surface border-none focus:outline-none text-body-medium placeholder-on-surface-variant/50 disabled:opacity-55"
+          />
+          
+          <button
+            onClick={handleSendText}
+            disabled={!inputText.trim() || isRecording || isProcessing}
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-primary text-white hover:bg-primary/95 disabled:bg-surface-variant disabled:text-on-surface-variant/50 transition-all focus:outline-none active:scale-95 shrink-0"
+            aria-label="Send typed details"
+          >
+            <span className="material-symbols-outlined text-[20px] font-bold">send</span>
+          </button>
+          
+          <div className="h-6 w-[1px] bg-surface-variant/60 shrink-0"></div>
+          
+          <div className="shrink-0 pointer-events-auto">
             <MicButton
               isRecording={isRecording}
               onRecordingChange={onRecordingChange}
