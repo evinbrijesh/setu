@@ -1,10 +1,4 @@
-"""
-sarvam_client.py — thin wrappers around Sarvam AI's REST STT and TTS
-endpoints. Uses the batch/REST endpoints (not WebSocket streaming) for
-Phase 1 — simpler to get working first, upgrade to streaming later if
-time allows.
-"""
-
+import asyncio
 import base64
 import os
 import httpx
@@ -31,28 +25,84 @@ async def transcribe_audio(
     """
     Sends audio to Saaras v3 STT REST endpoint, returns transcribed text.
 
-    Fallback: If Sarvam API fails or key is missing, returns empty string.
+    Fallback: If Sarvam API fails or key is missing, uses Gemini 1.5 Flash (if ENABLE_FALLBACKS=true).
     """
-    if not SARVAM_API_KEY:
-        return ""
+    # 1. Try Sarvam STT first
+    if SARVAM_API_KEY:
+        try:
+            url = f"{SARVAM_BASE_URL}/speech-to-text"
+            headers = {"api-subscription-key": SARVAM_API_KEY}
+            files = {"file": (filename, audio_bytes, "audio/wav")}
+            data = {
+                "model": "saaras:v3",
+                "language_code": language_code,
+                "mode": mode,
+            }
 
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, headers=headers, files=files, data=data)
+                if response.status_code == 200:
+                    result = response.json()
+                    transcript = result.get("transcript", "").strip()
+                    if transcript:
+                        return transcript
+                else:
+                    print(f"Sarvam STT returned code {response.status_code}: {response.text}")
+        except Exception as e:
+            print(f"Sarvam STT connection failed: {e}")
+
+    # 2. Try Gemini STT fallback (only if enabled)
+    if os.environ.get("ENABLE_FALLBACKS") == "true":
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+        if gemini_key:
+            print("Trying Gemini STT audio transcription fallback...")
+            loop = asyncio.get_event_loop()
+            gemini_transcript = await loop.run_in_executor(
+                None, _call_gemini_stt_fallback, audio_bytes, gemini_key
+            )
+            return gemini_transcript
+
+    return ""
+
+
+def _call_gemini_stt_fallback(audio_bytes: bytes, gemini_key: str) -> str:
+    """Call Google AI Studio's Gemini 1.5 Flash to transcribe inline audio bytes."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+    
+    # Base64 encode the WAV audio bytes for inline multimodal input
+    audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+    
+    payload = {
+        "contents": [{
+            "parts": [
+                {
+                    "inlineData": {
+                        "mimeType": "audio/wav",
+                        "data": audio_b64
+                    }
+                },
+                {
+                    "text": (
+                        "Transcribe the spoken audio. Return ONLY the transcribed text "
+                        "in the language spoken (Hindi, English or Tamil). Do not add "
+                        "any metadata, formatting, or commentary."
+                    )
+                }
+            ]
+        }]
+    }
+    headers = {"Content-Type": "application/json"}
     try:
-        url = f"{SARVAM_BASE_URL}/speech-to-text"
-        headers = {"api-subscription-key": SARVAM_API_KEY}
-        files = {"file": (filename, audio_bytes, "audio/wav")}
-        data = {
-            "model": "saaras:v3",
-            "language_code": language_code,
-            "mode": mode,
-        }
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, headers=headers, files=files, data=data)
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post(url, headers=headers, json=payload)
             if response.status_code == 200:
-                result = response.json()
-                return result.get("transcript", "")
+                res_json = response.json()
+                text = res_json["candidates"][0]["content"]["parts"][0]["text"].strip()
+                return text
+            else:
+                print(f"Gemini STT API error {response.status_code}: {response.text}")
     except Exception as e:
-        print(f"Sarvam STT failed: {e}")
+        print(f"Gemini STT fallback connection failed: {e}")
     return ""
 
 
