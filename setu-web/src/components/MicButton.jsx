@@ -13,6 +13,7 @@ export default function MicButton({
   onAudioResponse,
   language = "hi-IN",
   workflowInstanceId = null,
+  schemeId = null,
   size = "lg",
 }) {
   const wsRef = useRef(null);
@@ -68,6 +69,7 @@ export default function MicButton({
           type: "start_session",
           user_id: userId,
           language_code: language,
+          scheme_id: schemeId,
           ...(workflowInstanceId ? { workflow_instance_id: workflowInstanceId } : {}),
         })
       );
@@ -95,7 +97,7 @@ export default function MicButton({
       onRecordingChange(false);
       onProcessingChange?.(false);
     };
-  }, [language, workflowInstanceId, onRecordingChange, onProcessingChange, onTranscript, onAgentResponse, onSessionState, onAudioResponse]);
+  }, [language, workflowInstanceId, schemeId, onRecordingChange, onProcessingChange, onTranscript, onAgentResponse, onSessionState, onAudioResponse]);
 
   const stopRecording = useCallback(() => {
     const mr = mediaRecorderRef.current;

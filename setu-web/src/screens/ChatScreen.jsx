@@ -71,6 +71,7 @@ export default function ChatScreen({
         type: "start_session",
         user_id: userId,
         language_code: language,
+        scheme_id: schemeId,
         ...(workflowInstanceId ? { workflow_instance_id: workflowInstanceId } : {})
       }));
 
@@ -220,6 +221,7 @@ export default function ChatScreen({
               onAudioResponse={onAudioResponse}
               language={language}
               workflowInstanceId={workflowInstanceId}
+              schemeId={schemeId}
               size="sm"
             />
           </div>

@@ -97,6 +97,7 @@ async def trigger_setu_turn(
         return raw_func(
             user_id,
             raw_utterance,
+            scheme_id=scheme_id,
             existing_instance_id=existing_instance_id,
         )
 

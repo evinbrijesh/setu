@@ -371,6 +371,7 @@ async def audio_websocket(websocket: WebSocket):
                     session_user_id = control.get("user_id", str(uuid4()))
                     session_language = control.get("language_code", "hi-IN")
                     session_workflow_instance_id = control.get("workflow_instance_id")
+                    session_scheme_id = control.get("scheme_id")
                     response = {
                         "type": "session_started",
                         "user_id": session_user_id,
@@ -414,6 +415,7 @@ async def audio_websocket(websocket: WebSocket):
                     result = await trigger_setu_turn(
                         user_id=user_id,
                         raw_utterance=transcript,
+                        scheme_id=session_scheme_id,
                         existing_instance_id=session_workflow_instance_id,
                     )
 

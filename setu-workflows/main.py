@@ -50,6 +50,7 @@ app = Workflows.from_workflows(
 def run_setu_turn(
     user_id: str,
     raw_utterance: str,
+    scheme_id: str | None = None,
     existing_instance_id: str | None = None,
 ) -> dict[str, Any]:
     """Top-level orchestrator: process one user utterance through the pipeline.
@@ -70,6 +71,7 @@ def run_setu_turn(
     Args:
         user_id: The UUID of the user.
         raw_utterance: The transcribed text from the user's spoken input.
+        scheme_id: Explicit scheme identifier (from frontend context).
         existing_instance_id: Known workflow instance ID (from session lookup).
 
     Returns:
@@ -89,7 +91,7 @@ def run_setu_turn(
         intake_task,
         user_id,
         raw_utterance,
-        scheme_id=None,
+        scheme_id=scheme_id,
         existing_instance_id=existing_instance_id,
     )
 
