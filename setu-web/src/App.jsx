@@ -350,6 +350,13 @@ export default function App() {
     setFailedReasons([]);
     setMessages([]);
     setFields(PM_KISAN_FIELDS);
+    
+    // Generate a fresh user ID to clear any cached database context for this user session
+    const newUserId = crypto.randomUUID();
+    localStorage.setItem("setu_user_id", newUserId);
+    setUserName("");
+    localStorage.removeItem("setu_user_name");
+
     localStorage.removeItem("setu_workflow_id");
     localStorage.removeItem("setu_workflow_complete");
     localStorage.removeItem("setu_workflow_eligible");
