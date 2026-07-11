@@ -5,6 +5,8 @@ export default function CompletionScreen({
   schemeName,
   beneficiaryName,
   pdfDownloadUrl,
+  isEligible = true,
+  failedReasons = [],
   onStartNew,
 }) {
   const { setScreen } = useLocation();
@@ -13,7 +15,6 @@ export default function CompletionScreen({
   const handleDownload = () => {
     if (pdfDownloadUrl) {
       setDownloading(true);
-      // Open the signed URL in a new tab
       window.open(pdfDownloadUrl, "_blank");
       setTimeout(() => setDownloading(false), 2000);
     }
@@ -24,23 +25,40 @@ export default function CompletionScreen({
     setScreen("welcome");
   };
 
+  // Dual-mode styling configurations
+  const heroIcon = isEligible ? "check_circle" : "cancel";
+  const heroIconColor = isEligible ? "text-on-primary-container" : "text-error";
+  const heroBg = isEligible ? "bg-primary-container" : "bg-error-container";
+  const heroTitle = isEligible ? "Your application is ready" : "Application Rejected";
+  const heroSubtitle = isEligible 
+    ? "We have generated the required forms based on the information provided."
+    : "Based on the verification checks, you do not meet the eligibility criteria for this scheme.";
+
+  const statusIcon = isEligible ? "task_alt" : "error";
+  const statusIconColor = isEligible ? "text-tertiary-container" : "text-error";
+  const statusText = isEligible ? "Ready to download" : "Validation failed";
+  const statusBadgeClass = isEligible 
+    ? "bg-tertiary-fixed text-on-tertiary-fixed" 
+    : "bg-error text-white font-semibold";
+  const statusBadgeText = isEligible ? "Complete" : "Ineligible";
+
   return (
     <main className="w-full max-w-[1440px] px-container-padding mx-auto flex-grow flex flex-col lg:flex-row items-center justify-center gap-12 lg:gap-24 pt-8 md:pt-0 pb-16 lg:pb-0">
       {/* Left: Hero */}
       <div className="flex flex-col items-center lg:items-start text-center lg:text-left flex-1 max-w-[600px]">
-        <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-primary-container flex items-center justify-center mb-6 shadow-sm">
+        <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full ${heroBg} flex items-center justify-center mb-6 shadow-sm`}>
           <span
-            className="material-symbols-outlined text-on-primary-container text-[48px] md:text-[64px]"
+            className={`material-symbols-outlined ${heroIconColor} text-[48px] md:text-[64px]`}
             style={{ fontVariationSettings: "'FILL' 1" }}
           >
-            check_circle
+            {heroIcon}
           </span>
         </div>
         <h1 className="text-headline-lg-mobile md:text-headline-xl text-primary mb-4">
-          Your application is ready
+          {heroTitle}
         </h1>
         <p className="text-body-md md:text-body-lg text-on-surface-variant max-w-lg lg:max-w-md">
-          We have generated the required forms based on the information provided.
+          {heroSubtitle}
         </p>
       </div>
 
@@ -57,6 +75,7 @@ export default function CompletionScreen({
                 </p>
               </div>
             </div>
+            
             <div className="flex justify-between items-start pb-6 border-b border-surface-variant">
               <div>
                 <p className="text-label-lg text-secondary mb-2">Beneficiary</p>
@@ -65,20 +84,33 @@ export default function CompletionScreen({
                 </p>
               </div>
             </div>
+
+            {/* Render failure details list if validation failed */}
+            {!isEligible && failedReasons.length > 0 && (
+              <div className="flex flex-col gap-2 pb-6 border-b border-surface-variant">
+                <p className="text-label-lg text-error font-semibold">Reason(s) for Ineligibility</p>
+                <ul className="list-disc pl-5 text-body-md text-on-surface-variant flex flex-col gap-1">
+                  {failedReasons.map((reason, idx) => (
+                    <li key={idx} className="leading-relaxed">{reason}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="flex justify-between items-center pt-2">
               <div className="flex items-center gap-3">
                 <span
-                  className="material-symbols-outlined text-tertiary-container md:text-[28px]"
+                  className={`material-symbols-outlined ${statusIconColor} md:text-[28px]`}
                   style={{ fontVariationSettings: "'FILL' 1" }}
                 >
-                  task_alt
+                  {statusIcon}
                 </span>
                 <p className="text-body-md md:text-body-lg text-on-background font-medium">
-                  Ready to download
+                  {statusText}
                 </p>
               </div>
-              <span className="bg-tertiary-fixed text-on-tertiary-fixed text-label-lg md:text-[16px] px-4 py-2 rounded-full">
-                Complete
+              <span className={`${statusBadgeClass} text-label-lg md:text-[16px] px-4 py-2 rounded-full`}>
+                {statusBadgeText}
               </span>
             </div>
           </div>
@@ -86,19 +118,25 @@ export default function CompletionScreen({
 
         {/* Actions */}
         <div className="w-full flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6 mb-8">
-          <button
-            onClick={handleDownload}
-            disabled={!pdfDownloadUrl || downloading}
-            className="w-full md:w-auto bg-primary text-on-primary text-label-lg md:text-[16px] py-4 md:py-4 px-8 rounded-full shadow-sm hover:bg-primary-container transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span className="material-symbols-outlined">download</span>
-            {downloading ? "Opening..." : "Download your form"}
-          </button>
+          {isEligible && (
+            <button
+              onClick={handleDownload}
+              disabled={!pdfDownloadUrl || downloading}
+              className="w-full md:w-auto bg-primary text-on-primary text-label-lg md:text-[16px] py-4 md:py-4 px-8 rounded-full shadow-sm hover:bg-primary-container transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="material-symbols-outlined">download</span>
+              {downloading ? "Opening..." : "Download your form"}
+            </button>
+          )}
           <button
             onClick={handleStartNew}
-            className="w-full md:w-auto bg-transparent text-primary border-2 border-primary md:border-transparent text-label-lg md:text-[16px] py-4 px-8 rounded-full hover:bg-surface-container hover:border-transparent transition-all"
+            className={`w-full md:w-auto text-label-lg md:text-[16px] py-4 px-8 rounded-full transition-all ${
+              isEligible
+                ? "bg-transparent text-primary border-2 border-primary md:border-transparent hover:bg-surface-container hover:border-transparent"
+                : "bg-primary text-white hover:bg-primary/95 shadow-sm"
+            }`}
           >
-            Start another application
+            {isEligible ? "Start another application" : "Try another scheme"}
           </button>
         </div>
 
@@ -109,9 +147,11 @@ export default function CompletionScreen({
               className="material-symbols-outlined text-secondary md:text-[28px]"
               style={{ fontVariationSettings: "'FILL' 0" }}
             >
-              info
+              {isEligible ? "info" : "help"}
             </span>
-            Take this printed form to your nearest Block Development Office.
+            {isEligible 
+              ? "Take this printed form to your nearest Block Development Office."
+              : "Review scheme requirements, or check if you qualify for another benefit."}
           </p>
         </div>
       </div>

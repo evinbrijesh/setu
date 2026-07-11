@@ -72,6 +72,8 @@ export default function App() {
   // Workflow completion
   const [isComplete, setIsComplete] = useState(false);
   const [pdfDownloadUrl, setPdfDownloadUrl] = useState("");
+  const [isEligible, setIsEligible] = useState(true);
+  const [failedReasons, setFailedReasons] = useState([]);
 
   // Derive current field index
   const currentFieldIndex = fields.findIndex((f) => f.value === null);
@@ -314,6 +316,14 @@ export default function App() {
       setIsComplete(true);
       localStorage.setItem("setu_workflow_complete", "true");
     }
+    if (state.eligible !== undefined) {
+      setIsEligible(state.eligible);
+      localStorage.setItem("setu_workflow_eligible", state.eligible ? "true" : "false");
+    }
+    if (state.failed_reasons) {
+      setFailedReasons(state.failed_reasons);
+      localStorage.setItem("setu_workflow_failed_reasons", JSON.stringify(state.failed_reasons));
+    }
   }, []);
 
   const handleAudioResponse = useCallback((blob) => {
@@ -336,10 +346,14 @@ export default function App() {
     setIsResumed(false);
     setIsComplete(false);
     setPdfDownloadUrl("");
+    setIsEligible(true);
+    setFailedReasons([]);
     setMessages([]);
     setFields(PM_KISAN_FIELDS);
     localStorage.removeItem("setu_workflow_id");
     localStorage.removeItem("setu_workflow_complete");
+    localStorage.removeItem("setu_workflow_eligible");
+    localStorage.removeItem("setu_workflow_failed_reasons");
     localStorage.removeItem("setu_scheme_name");
     localStorage.removeItem("setu_scheme_id");
   }, []);
@@ -352,9 +366,18 @@ export default function App() {
     const storedSchemeName = localStorage.getItem("setu_scheme_name");
     const storedSchemeId = localStorage.getItem("setu_scheme_id") || "pm_kisan";
     const wasComplete = localStorage.getItem("setu_workflow_complete") === "true";
+    const wasEligible = localStorage.getItem("setu_workflow_eligible") !== "false";
+    const storedReasons = localStorage.getItem("setu_workflow_failed_reasons");
     const storedUserName = localStorage.getItem("setu_user_name");
 
     if (storedUserName) setUserName(storedUserName);
+    
+    setIsEligible(wasEligible);
+    if (storedReasons) {
+      try {
+        setFailedReasons(JSON.parse(storedReasons));
+      } catch (_) {}
+    }
 
     if (storedWorkflowId) {
       setWorkflowInstanceId(storedWorkflowId);
@@ -506,6 +529,8 @@ export default function App() {
               fields.find((f) => f.name === "full_name")?.value || userName
             }
             pdfDownloadUrl={pdfDownloadUrl}
+            isEligible={isEligible}
+            failedReasons={failedReasons}
             onStartNew={handleStartNew}
           />
         )}
