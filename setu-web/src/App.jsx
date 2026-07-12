@@ -9,19 +9,21 @@ import HistoryScreen from "./screens/HistoryScreen";
 import PreviewScreen from "./screens/PreviewScreen";
 
 const PM_KISAN_FIELDS = [
-  { name: "owns_land", type: "boolean", prompt: "Do you own agricultural land?", value: null },
+  { name: "owns_land", type: "boolean", prompt: "Do you own agricultural land?", value: null, criteria: "Must own cultivable agricultural land to be eligible." },
   {
     name: "land_size_acres",
     type: "number",
     prompt: "How many acres of agricultural land do you own?",
     value: null,
     depends_on: { field: "owns_land", value: true },
+    criteria: "Total cultivable landholding size must be 2.0 acres or less to qualify.",
   },
   {
     name: "has_aadhaar_linked_bank",
     type: "boolean",
     prompt: "Is your bank account linked to Aadhaar?",
     value: null,
+    criteria: "Your bank account must be linked to your Aadhaar card to receive benefits.",
   },
   { name: "district", type: "text", prompt: "Which district is your land registered in?", value: null },
   { name: "full_name", type: "text", prompt: "What is your full name as per Aadhaar?", value: null },
@@ -32,14 +34,14 @@ const CASTE_FIELDS = [
   { name: "state", type: "text", prompt: "Which state are you residing in?", value: null },
   { name: "caste_category", type: "text", prompt: "What is your caste category (e.g. OBC, SC, ST)?", value: null },
   { name: "sub_caste", type: "text", prompt: "What is your sub-caste name?", value: null },
-  { name: "annual_family_income", type: "number", prompt: "What is your annual family income?", value: null }
+  { name: "annual_family_income", type: "number", prompt: "What is your annual family income?", value: null, criteria: "Family income must be Rs. 8,00,000 or less to be eligible for OBC non-creamy layer benefits." }
 ];
 
 const INCOME_FIELDS = [
   { name: "full_name", type: "text", prompt: "What is your full name?", value: null },
   { name: "district", type: "text", prompt: "Which district is your residence located in?", value: null },
   { name: "occupation", type: "text", prompt: "What is your occupation or profession?", value: null },
-  { name: "annual_income", type: "number", prompt: "What is your annual income?", value: null }
+  { name: "annual_income", type: "number", prompt: "What is your annual income?", value: null, criteria: "Your total annual family income must be Rs. 3,00,000 or less to qualify for the scheme." }
 ];
 
 export default function App() {

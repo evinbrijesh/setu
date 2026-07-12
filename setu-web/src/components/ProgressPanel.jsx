@@ -14,6 +14,41 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
     return null;
   }
 
+  // Active step details
+  const activeField = fields[currentFieldIndex];
+
+  // Helper to scan for disqualification criteria in real-time
+  const getDisqualificationWarning = () => {
+    if (schemeId === "pm_kisan") {
+      const ownsLandField = fields.find((f) => f.name === "owns_land");
+      const landSizeField = fields.find((f) => f.name === "land_size_acres");
+      const bankLinkedField = fields.find((f) => f.name === "has_aadhaar_linked_bank");
+
+      if (ownsLandField && ownsLandField.value === false) {
+        return "Must own cultivable agricultural land to qualify.";
+      }
+      if (landSizeField && landSizeField.value !== null && Number(landSizeField.value) > 2.0) {
+        return `Total agricultural land registered (${landSizeField.value} acres) exceeds the maximum limit of 2.0 acres.`;
+      }
+      if (bankLinkedField && bankLinkedField.value === false) {
+        return "Your bank account must be linked to Aadhaar to qualify.";
+      }
+    } else if (schemeId === "caste_cert") {
+      const incomeField = fields.find((f) => f.name === "annual_family_income");
+      if (incomeField && incomeField.value !== null && Number(incomeField.value) > 800000) {
+        return `Annual family income (Rs. ${Number(incomeField.value).toLocaleString()}) exceeds the Rs. 8,00,000 creamy layer limit.`;
+      }
+    } else if (schemeId === "income_cert") {
+      const incomeField = fields.find((f) => f.name === "annual_income");
+      if (incomeField && incomeField.value !== null && Number(incomeField.value) > 300000) {
+        return `Annual household income (Rs. ${Number(incomeField.value).toLocaleString()}) exceeds the Rs. 3,00,000 welfare limit.`;
+      }
+    }
+    return null;
+  };
+
+  const disqualificationWarning = getDisqualificationWarning();
+
   // Helper to fetch the value or state of a field by name
   const getFieldInfo = (fieldName) => {
     const idx = fields.findIndex((f) => f.name === fieldName);
@@ -328,6 +363,36 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
 
       {/* Panel Body */}
       <div className="flex-grow flex flex-col relative min-h-[480px] overflow-hidden">
+        {/* Active Step Criteria */}
+        {activeField && activeField.criteria && (
+          <div className="bg-[#fffbeb] border border-[#fef3c7] p-3 rounded-xl text-left shadow-sm flex items-start gap-2.5 mb-4 shrink-0">
+            <span className="material-symbols-outlined text-[#d97706] text-[18px] shrink-0 mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>
+              info_i
+            </span>
+            <div>
+              <h5 className="font-bold text-[9px] text-[#b45309] uppercase tracking-wider">Rule for current step</h5>
+              <p className="text-[11px] text-[#92400e] mt-0.5 leading-relaxed font-semibold">
+                {activeField.criteria}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Disqualification Warning */}
+        {disqualificationWarning && (
+          <div className="bg-[#fef2f2] border border-[#fee2e2] p-3 rounded-xl text-left shadow-sm flex items-start gap-2.5 mb-4 shrink-0">
+            <span className="material-symbols-outlined text-[#dc2626] text-[18px] shrink-0 mt-0.5 animate-bounce" style={{ fontVariationSettings: "'FILL' 1" }}>
+              warning
+            </span>
+            <div>
+              <h5 className="font-bold text-[9px] text-[#991b1b] uppercase tracking-wider">Disqualification detected</h5>
+              <p className="text-[11px] text-[#7f1d1d] mt-0.5 leading-relaxed font-bold">
+                {disqualificationWarning} You can state a correction (e.g. "I mean 1.5 acres") to update the form.
+              </p>
+            </div>
+          </div>
+        )}
+
         {viewMode === "form" ? (
           <div className="flex-1 w-full relative">
             {renderLiveForm()}
