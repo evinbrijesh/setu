@@ -62,31 +62,58 @@ export default function MicButton({
     };
 
     ws.onopen = async () => {
-      const userId = localStorage.getItem("setu_user_id") || crypto.randomUUID();
-      localStorage.setItem("setu_user_id", userId);
-      ws.send(
-        JSON.stringify({
-          type: "start_session",
-          user_id: userId,
-          language_code: language,
-          scheme_id: schemeId,
-          ...(workflowInstanceId ? { workflow_instance_id: workflowInstanceId } : {}),
-        })
-      );
+      try {
+        const userId = localStorage.getItem("setu_user_id") || crypto.randomUUID();
+        localStorage.setItem("setu_user_id", userId);
+        ws.send(
+          JSON.stringify({
+            type: "start_session",
+            user_id: userId,
+            language_code: language,
+            scheme_id: schemeId,
+            ...(workflowInstanceId ? { workflow_instance_id: workflowInstanceId } : {}),
+          })
+        );
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      setMicStream(stream);
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-          e.data.arrayBuffer().then((buf) => ws.send(buf));
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("navigator.mediaDevices.getUserMedia is undefined. Secure context (HTTPS/localhost) required.");
         }
-      };
 
-      mediaRecorder.start(250);
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+        setMicStream(stream);
+
+        let options = {};
+        if (typeof MediaRecorder !== "undefined") {
+          if (MediaRecorder.isTypeSupported("audio/webm")) {
+            options = { mimeType: "audio/webm" };
+          } else if (MediaRecorder.isTypeSupported("audio/ogg")) {
+            options = { mimeType: "audio/ogg" };
+          } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+            options = { mimeType: "audio/mp4" };
+          }
+        }
+
+        const mediaRecorder = new MediaRecorder(stream, options);
+        mediaRecorderRef.current = mediaRecorder;
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+            e.data.arrayBuffer().then((buf) => ws.send(buf));
+          }
+        };
+
+        mediaRecorder.start(250);
+      } catch (err) {
+        console.error("WebSocket microphone start failed:", err);
+        alert(
+          "Could not access your microphone. Please verify that: \n" +
+          "1. Microphone permissions are granted.\n" +
+          "2. You are using a secure context (localhost or HTTPS)."
+        );
+        ws.close();
+        onRecordingChange(false);
+      }
     };
 
     ws.onclose = () => {

@@ -51,7 +51,7 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
         </span>
       );
     }
-    return <span className="text-gray-300 dark:text-gray-700">{fallbackText}</span>;
+    return <span className="text-[#a48464] font-serif">{fallbackText}</span>;
   };
 
   const renderCheckbox = (fieldName, targetValue) => {
@@ -74,9 +74,14 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
   const renderLiveForm = () => {
     if (schemeId === "pm_kisan") {
       return (
-        <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative">
+        <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative text-left">
+          {/* Official Seal Watermark */}
+          <span className="material-symbols-outlined text-[100px] text-[#8a6842]/5 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 select-none pointer-events-none">
+            account_balance
+          </span>
+
           {/* Header */}
-          <div className="text-center border-b pb-2 border-[#e6dfd5]">
+          <div className="text-center border-b pb-2 border-[#e6dfd5] z-10">
             <span className="font-bold text-[10px] tracking-wider uppercase block text-[#8a6842]">GOVERNMENT OF INDIA</span>
             <span className="text-[9px] text-[#8c7457] uppercase block">DEPARTMENT OF AGRICULTURE & COOPERATION</span>
             <div className="font-bold text-xs uppercase underline mt-2 text-[#8a6842]">
@@ -85,14 +90,14 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
           </div>
 
           {/* Photo Affix */}
-          <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80">
+          <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80 z-10">
             PASTE<br/>PHOTO
           </div>
 
           {/* Form Content */}
-          <div className="space-y-4 mt-4 pr-16">
+          <div className="space-y-4 mt-4 pr-16 z-10">
             <div>
-              <span className="font-bold uppercase tracking-tight block text-secondary text-[9px] mb-1">
+              <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
                 Section I — Farmer Profile
               </span>
               <div className="grid grid-cols-1 gap-2 pl-2">
@@ -102,7 +107,7 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
             </div>
 
             <div>
-              <span className="font-bold uppercase tracking-tight block text-secondary text-[9px] mb-1">
+              <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
                 Section II — Land Details
               </span>
               <div className="grid grid-cols-1 gap-2 pl-2">
@@ -117,7 +122,7 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
             </div>
 
             <div>
-              <span className="font-bold uppercase tracking-tight block text-secondary text-[9px] mb-1">
+              <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
                 Section III — Bank & Aadhaar Verification
               </span>
               <div className="grid grid-cols-1 gap-2 pl-2">
@@ -131,12 +136,12 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
           </div>
 
           {/* Declaration and Signature */}
-          <div className="mt-6 border-t pt-2 border-outline-variant/30 flex justify-between items-end">
-            <div className="w-1/2 text-[7.5px] leading-tight text-secondary">
+          <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end z-10">
+            <div className="w-1/2 text-[7.5px] leading-tight text-[#8c7457]">
               * Verification checklist is evaluated automatically in real-time. Disqualification criteria checks apply.
             </div>
             <div className="text-center w-1/3">
-              <div className="border-t border-on-surface w-full mt-4"></div>
+              <div className="border-t border-[#3c2f2f] w-full mt-4"></div>
               <span className="text-[8px] font-bold">Farmer Signature</span>
             </div>
           </div>
@@ -146,8 +151,13 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
 
     if (schemeId === "caste_cert") {
       return (
-        <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative">
-          <div className="text-center border-b pb-2 border-[#e6dfd5]">
+        <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative text-left">
+          {/* Official Seal Watermark */}
+          <span className="material-symbols-outlined text-[100px] text-[#8a6842]/5 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 select-none pointer-events-none">
+            account_balance
+          </span>
+
+          <div className="text-center border-b pb-2 border-[#e6dfd5] z-10">
             <span className="font-bold text-[10px] tracking-wider uppercase block text-[#8a6842]">REVENUE DEPARTMENT</span>
             <span className="text-[9px] text-[#8c7457] uppercase block">APPLICATION FOR COMMUNITY STATUS</span>
             <div className="font-bold text-xs uppercase underline mt-2 text-[#8a6842]">
@@ -156,11 +166,11 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
           </div>
 
           {/* Photo Affix */}
-          <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80">
+          <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80 z-10">
             PASTE<br/>PHOTO
           </div>
 
-          <div className="space-y-4 mt-4 pr-16">
+          <div className="space-y-4 mt-4 pr-16 z-10">
             <div>
               <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
                 Section I — Applicant Profile
@@ -191,7 +201,7 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
             </div>
           </div>
 
-          <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end">
+          <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end z-10">
             <div className="w-1/2 text-[7.5px] leading-tight text-[#8c7457]">
               * Non-creamy layer verification is processed automatically based on state classifications.
             </div>
@@ -206,8 +216,13 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
 
     // Default: Income Certificate
     return (
-      <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative">
-        <div className="text-center border-b pb-2 border-[#e6dfd5]">
+      <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative text-left">
+        {/* Official Seal Watermark */}
+        <span className="material-symbols-outlined text-[100px] text-[#8a6842]/5 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 select-none pointer-events-none">
+          account_balance
+        </span>
+
+        <div className="text-center border-b pb-2 border-[#e6dfd5] z-10">
           <span className="font-bold text-[10px] tracking-wider uppercase block text-[#8a6842]">REVENUE DEPARTMENT</span>
           <span className="text-[9px] text-[#8c7457] uppercase block">OFFICE OF THE TAHSILDAR</span>
           <div className="font-bold text-xs uppercase underline mt-2 text-[#8a6842]">
@@ -216,11 +231,11 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
         </div>
 
         {/* Photo Affix */}
-        <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80">
+        <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80 z-10">
           PASTE<br/>PHOTO
         </div>
 
-        <div className="space-y-4 mt-4 pr-16">
+        <div className="space-y-4 mt-4 pr-16 z-10">
           <div>
             <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
               Section I — Declarant Details
@@ -232,7 +247,7 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
           </div>
 
           <div>
-            <span className="font-bold uppercase tracking-tight block text-secondary text-[9px] mb-1">
+            <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
               Section II — Occupation & Earnings
             </span>
             <div className="grid grid-cols-1 gap-2 pl-2">
@@ -242,12 +257,12 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
           </div>
         </div>
 
-        <div className="mt-6 border-t pt-2 border-outline-variant/30 flex justify-between items-end">
-          <div className="w-1/2 text-[7.5px] leading-tight text-secondary">
+        <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end z-10">
+          <div className="w-1/2 text-[7.5px] leading-tight text-[#8c7457]">
             * Declared income must match local circle rate assessments and tax declaration.
           </div>
           <div className="text-center w-1/3">
-            <div className="border-t border-on-surface w-full mt-4"></div>
+            <div className="border-t border-[#3c2f2f] w-full mt-4"></div>
             <span className="text-[8px] font-bold">Declarant Signature</span>
           </div>
         </div>
@@ -256,27 +271,29 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
   };
 
   return (
-    <div className="bg-white border border-surface-variant rounded-xl p-6 shadow-[0_2px_12px_rgba(0,35,111,0.04)] w-full shrink-0 flex flex-col min-h-[460px]">
+    <div className="bg-white border border-surface-variant rounded-xl p-6 shadow-[0_2px_12px_rgba(0,35,111,0.04)] w-full shrink-0 flex flex-col min-h-[580px]">
       {/* Header Info */}
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start mb-4 shrink-0">
         <div>
-          <h3 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold tracking-tight">
+          <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">
             Application Progress
           </h3>
-          <p className="text-secondary text-[13px] capitalize">
+          <span className="text-xs text-secondary tracking-wide block mt-0.5">
             {schemeName} Application
-          </p>
+          </span>
         </div>
-        <div className="text-right">
-          <span className="text-primary font-bold text-lg">{progressPct}%</span>
-          <p className="font-label-lg text-secondary text-[10px] uppercase tracking-wider">
-            Filled
-          </p>
+        <div className="text-right shrink-0">
+          <span className="block font-headline-md text-headline-md text-primary font-extrabold tracking-tight">
+            {progressPct}%
+          </span>
+          <span className="text-[10px] text-secondary font-bold uppercase tracking-wider block mt-0.5">
+            FILLED
+          </span>
         </div>
       </div>
 
-      {/* View Mode Toggle */}
-      <div className="flex gap-1 bg-surface-container-low p-1 rounded-full w-full border border-outline-variant/30 mb-6 shrink-0">
+      {/* Tab Switcher */}
+      <div className="bg-surface-container-high rounded-full p-1.5 flex gap-1 mb-5 shrink-0 border border-surface-variant/30">
         <button
           onClick={() => setViewMode("form")}
           className={`flex-1 py-2 rounded-full text-xs font-semibold transition-all ${
@@ -310,7 +327,7 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
       </div>
 
       {/* Panel Body */}
-      <div className="flex-grow flex flex-col relative h-[360px] overflow-hidden">
+      <div className="flex-grow flex flex-col relative min-h-[480px] overflow-hidden">
         {viewMode === "form" ? (
           <div className="flex-1 w-full relative">
             {renderLiveForm()}

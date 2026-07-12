@@ -363,9 +363,12 @@ async def audio_websocket(websocket: WebSocket):
             if "bytes" in message and message["bytes"] is not None:
                 # Buffer incoming binary audio chunks from MediaRecorder
                 audio_chunks.append(message["bytes"])
+                if len(audio_chunks) % 10 == 1 or len(audio_chunks) <= 5:
+                    print(f"[WS] Received binary chunk ({len(message['bytes'])} bytes). Total chunks: {len(audio_chunks)}")
 
             elif "text" in message and message["text"] is not None:
                 control = json.loads(message["text"])
+                print(f"[WS] Received control message: {control}")
 
                 if control.get("type") == "start_session":
                     session_user_id = control.get("user_id", str(uuid4()))
@@ -387,24 +390,30 @@ async def audio_websocket(websocket: WebSocket):
                 if control.get("type") == "end_utterance" or is_text_utterance:
                     if is_text_utterance:
                         transcript = control.get("text", "")
+                        print(f"[WS] Received text utterance: '{transcript}'")
                     else:
+                        print(f"[WS] End of utterance signal received. Processing {len(audio_chunks)} audio chunks...")
                         if not audio_chunks:
+                            print("[WS] Error: no audio chunks in buffer!")
                             await websocket.send_json({"type": "error", "message": "No audio received"})
                             continue
 
                         raw_webm = b"".join(audio_chunks)
                         audio_chunks = []  # reset buffer for next utterance
+                        print(f"[WS] Combined raw webm size: {len(raw_webm)} bytes. Transcoding to WAV...")
 
                         # Step 1: transcode webm -> wav
                         wav_bytes = await transcode_to_wav(raw_webm)
+                        print(f"[WS] Transcoded WAV size: {len(wav_bytes)} bytes. Calling transcription API...")
 
-                        # Step 2: STT via Saaras v3
+                        # Step 2: STT via Saaras v3 / Fallback
                         transcript = await transcribe_audio(
                             wav_bytes,
                             filename="utterance.wav",
                             language_code=session_language,
                             mode="codemix",
                         )
+                        print(f"[WS] Transcribed text: '{transcript}'")
 
                     await websocket.send_json(
                         {"type": "transcript", "text": transcript, "is_final": True}
@@ -412,12 +421,14 @@ async def audio_websocket(websocket: WebSocket):
 
                     # Step 3: Trigger setu-workflows pipeline
                     user_id = session_user_id or str(uuid4())
+                    print(f"[WS] Triggering workflow turn. User ID: {user_id}, Scheme: {session_scheme_id}, Existing ID: {session_workflow_instance_id}")
                     result = await trigger_setu_turn(
                         user_id=user_id,
                         raw_utterance=transcript,
                         scheme_id=session_scheme_id,
                         existing_instance_id=session_workflow_instance_id,
                     )
+                    print(f"[WS] Turn result: complete={result.get('complete')}, stage={result.get('current_stage')}, needs_reask={result.get('needs_reask')}")
 
                     # Send session state update
                     await websocket.send_json(
@@ -435,6 +446,7 @@ async def audio_websocket(websocket: WebSocket):
 
                     # Determine the agent's response text
                     response_text = _build_response_text(result)
+                    print(f"[WS] Agent response text generated: '{response_text}'")
 
                     # Update websocket session reference
                     session_workflow_instance_id = result.get("workflow_instance_id")
@@ -458,15 +470,17 @@ async def audio_websocket(websocket: WebSocket):
                         {"type": "agent_response_text", "text": response_text}
                     )
 
-                    # Step 4: TTS via Bulbul v3 — stream back
+                    # Step 4: TTS via Bulbul v3 / Fallback — stream back
+                    print(f"[WS] Synthesizing speech for agent response...")
                     response_audio = await synthesize_speech(
                         response_text,
                         target_language_code=session_language,
                     )
                     await websocket.send_bytes(response_audio)
+                    print(f"[WS] Sent audio bytes back. Size: {len(response_audio)} bytes.")
 
     except WebSocketDisconnect:
-        pass
+        print("[WS] WebSocket disconnected.")
 
 
 def _build_response_text(result: dict) -> str:

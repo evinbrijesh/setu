@@ -1,12 +1,46 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation } from "../components/ScreenContext";
 
-export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUploadAndProcess }) {
+export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onStartFresh, onUploadAndProcess }) {
   const { setScreen } = useLocation();
   const [analyzing, setAnalyzing] = useState(false);
+  const [draftInstance, setDraftInstance] = useState(null);
   const fileInputRef = useRef(null);
 
+  useEffect(() => {
+    const userId = localStorage.getItem("setu_user_id");
+    if (!userId) return;
+
+    // Check if there is an in-progress draft for this user and scheme
+    import("../lib/supabase.js")
+      .then(({ supabase }) => {
+        supabase
+          .table("workflow_instances")
+          .select("id, created_at")
+          .eq("user_id", userId)
+          .eq("scheme_id", schemeId)
+          .eq("status", "in_progress")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .then(({ data, error }) => {
+            if (data && !error) {
+              setDraftInstance(data);
+            } else {
+              setDraftInstance(null);
+            }
+          });
+      })
+      .catch(() => {});
+  }, [schemeId]);
+
   const handleProceed = () => {
+    // If browser doesn't support mic in this context, warn the user
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert(
+        "Microphone access requires a secure context (HTTPS) or localhost. Please check your browser address bar or use text input."
+      );
+    }
     onProceed?.();
   };
 
@@ -31,8 +65,13 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
     if (schemeId === "pm_kisan") {
       return (
         <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative text-left">
+          {/* Official Seal Watermark */}
+          <span className="material-symbols-outlined text-[100px] text-[#8a6842]/5 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 select-none pointer-events-none">
+            account_balance
+          </span>
+
           {/* Header */}
-          <div className="text-center border-b pb-2 border-[#e6dfd5]">
+          <div className="text-center border-b pb-2 border-[#e6dfd5] z-10">
             <span className="font-bold text-[10px] tracking-wider uppercase block text-[#8a6842]">GOVERNMENT OF INDIA</span>
             <span className="text-[9px] text-[#8c7457] uppercase block">DEPARTMENT OF AGRICULTURE & COOPERATION</span>
             <div className="font-bold text-xs uppercase underline mt-2 text-[#8a6842]">
@@ -41,12 +80,12 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
           </div>
 
           {/* Photo Affix */}
-          <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80">
+          <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80 z-10">
             PASTE<br/>PHOTO
           </div>
 
           {/* Form Content */}
-          <div className="space-y-4 mt-4 pr-16">
+          <div className="space-y-4 mt-4 pr-16 z-10">
             <div>
               <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
                 Section I — Farmer Profile
@@ -87,7 +126,7 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
           </div>
 
           {/* Declaration and Signature */}
-          <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end">
+          <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end z-10">
             <div className="w-1/2 text-[7.5px] leading-tight text-[#8c7457]">
               * Verification checklist is evaluated automatically in real-time. Disqualification criteria checks apply.
             </div>
@@ -103,7 +142,12 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
     if (schemeId === "caste_cert") {
       return (
         <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative text-left">
-          <div className="text-center border-b pb-2 border-[#e6dfd5]">
+          {/* Official Seal Watermark */}
+          <span className="material-symbols-outlined text-[100px] text-[#8a6842]/5 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 select-none pointer-events-none">
+            account_balance
+          </span>
+
+          <div className="text-center border-b pb-2 border-[#e6dfd5] z-10">
             <span className="font-bold text-[10px] tracking-wider uppercase block text-[#8a6842]">REVENUE DEPARTMENT</span>
             <span className="text-[9px] text-[#8c7457] uppercase block">APPLICATION FOR COMMUNITY STATUS</span>
             <div className="font-bold text-xs uppercase underline mt-2 text-[#8a6842]">
@@ -111,11 +155,11 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
             </div>
           </div>
 
-          <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80">
+          <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80 z-10">
             PASTE<br/>PHOTO
           </div>
 
-          <div className="space-y-4 mt-4 pr-16">
+          <div className="space-y-4 mt-4 pr-16 z-10">
             <div>
               <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
                 Section I — Applicant Profile
@@ -146,7 +190,7 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
             </div>
           </div>
 
-          <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end">
+          <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end z-10">
             <div className="w-1/2 text-[7.5px] leading-tight text-[#8c7457]">
               * Non-creamy layer verification is processed automatically based on state classifications.
             </div>
@@ -162,7 +206,12 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
     // Default: Income Certificate
     return (
       <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative text-left">
-        <div className="text-center border-b pb-2 border-[#e6dfd5]">
+        {/* Official Seal Watermark */}
+        <span className="material-symbols-outlined text-[100px] text-[#8a6842]/5 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 select-none pointer-events-none">
+          account_balance
+        </span>
+
+        <div className="text-center border-b pb-2 border-[#e6dfd5] z-10">
           <span className="font-bold text-[10px] tracking-wider uppercase block text-[#8a6842]">REVENUE DEPARTMENT</span>
           <span className="text-[9px] text-[#8c7457] uppercase block">OFFICE OF THE TAHSILDAR</span>
           <div className="font-bold text-xs uppercase underline mt-2 text-[#8a6842]">
@@ -170,11 +219,11 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
           </div>
         </div>
 
-        <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80">
+        <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80 z-10">
           PASTE<br/>PHOTO
         </div>
 
-        <div className="space-y-4 mt-4 pr-16">
+        <div className="space-y-4 mt-4 pr-16 z-10">
           <div>
             <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
               Section I — Declarant Details
@@ -196,7 +245,7 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
           </div>
         </div>
 
-        <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end">
+        <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end z-10">
           <div className="w-1/2 text-[7.5px] leading-tight text-[#8c7457]">
             * Declared income is verified against state income tax registries and land holdings.
           </div>
@@ -247,6 +296,36 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
             Review the application template below before starting your submission.
           </p>
         </div>
+
+        {/* Draft Option Warning Card */}
+        {draftInstance && (
+          <div className="bg-[#eaf5fc] dark:bg-[#1a2c3a] border border-[#a4cbe6] dark:border-[#2b4c64] p-4.5 rounded-2xl text-left max-w-sm mx-auto shadow-sm flex items-start gap-3.5 transition-all">
+            <span className="material-symbols-outlined text-primary text-[28px] shrink-0 mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>
+              info_i
+            </span>
+            <div className="flex-grow">
+              <h4 className="font-bold text-sm text-primary">Draft Application Found</h4>
+              <p className="text-xs text-secondary mt-1 leading-relaxed">
+                You have a draft application in progress for this service. Would you like to resume your draft or start fresh?
+              </p>
+              <div className="flex gap-2.5 mt-3">
+                <button
+                  onClick={() => onProceed?.(draftInstance.id)}
+                  className="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4.5 py-2.5 rounded-full transition-colors active:scale-95 shadow-md flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[14px]">play_arrow</span>
+                  Resume Draft
+                </button>
+                <button
+                  onClick={onStartFresh}
+                  className="border border-outline hover:bg-surface-container-low text-on-surface text-xs font-semibold px-4.5 py-2.5 rounded-full transition-all active:scale-95"
+                >
+                  Start Fresh
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Form Container */}
         <div className="w-full max-w-sm mx-auto aspect-[1/1.3] bg-white border border-[#e6dfd5] rounded-xl p-4 shadow-md flex flex-col justify-between relative select-none hover:border-primary/50 transition-colors">

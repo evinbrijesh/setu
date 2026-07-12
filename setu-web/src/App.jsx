@@ -97,7 +97,7 @@ export default function App() {
     []
   );
 
-  const handleProceedPreview = useCallback(() => {
+  const handleProceedPreview = useCallback((resumeInstanceId = null) => {
     const schemeId = selectedSchemeId;
     const name = selectedSchemeLabel;
     setSchemeName(name);
@@ -112,22 +112,45 @@ export default function App() {
     }
     
     setFields(selectedFields);
-    setWorkflowInstanceId(null);
-    localStorage.removeItem("setu_workflow_id");
-    localStorage.removeItem("setu_workflow_complete");
-    setIsResumed(false);
+    
+    if (resumeInstanceId) {
+      setWorkflowInstanceId(resumeInstanceId);
+      localStorage.setItem("setu_workflow_id", resumeInstanceId);
+      setIsResumed(true);
+      
+      setMessages([
+        {
+          role: "agent",
+          text: `Namaste! I found your draft application for ${name}. Let's resume and complete it.`,
+        },
+      ]);
+    } else {
+      setWorkflowInstanceId(null);
+      localStorage.removeItem("setu_workflow_id");
+      localStorage.removeItem("setu_workflow_complete");
+      setIsResumed(false);
+      
+      setMessages([
+        {
+          role: "agent",
+          text: `Namaste! I can help you apply for ${name}. Tap the mic and tell me about yourself.`,
+        },
+      ]);
+    }
+    
     setIsComplete(false);
     setPdfDownloadUrl("");
-
-    // Add an initial agent greeting message
-    setMessages([
-      {
-        role: "agent",
-        text: `Namaste! I can help you apply for ${name}. Tap the mic and tell me about yourself.`,
-      },
-    ]);
     setScreen("chat");
   }, [selectedSchemeId, selectedSchemeLabel]);
+
+  const handleStartFresh = useCallback(() => {
+    // Generate a fresh user ID
+    const newUserId = crypto.randomUUID();
+    localStorage.setItem("setu_user_id", newUserId);
+    
+    // Proceed with a clean slate
+    handleProceedPreview(null);
+  }, [handleProceedPreview]);
 
   const handleUploadAndProcess = useCallback((file) => {
     const fileNameLower = file.name.toLowerCase();
@@ -521,6 +544,7 @@ export default function App() {
             schemeId={selectedSchemeId}
             schemeLabel={selectedSchemeLabel}
             onProceed={handleProceedPreview}
+            onStartFresh={handleStartFresh}
             onUploadAndProcess={handleUploadAndProcess}
           />
         )}
