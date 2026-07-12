@@ -26,39 +26,75 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
     }, 2500);
   };
 
-  // Render blank form mockup based on scheme type
+  // Render blank high-fidelity form mockup based on scheme type
   const renderBlankFormMockup = () => {
     if (schemeId === "pm_kisan") {
       return (
-        <div className="flex flex-col gap-6 text-on-surface/80">
-          <div className="text-center border-b pb-4 border-outline-variant/50">
-            <span className="material-symbols-outlined text-4xl text-primary mb-1">agriculture</span>
-            <h4 className="font-bold text-lg text-primary">PM Kisan Samman Nidhi</h4>
-            <span className="text-xs text-secondary tracking-widest uppercase">Application Form</span>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <span className="block text-xs font-semibold text-secondary uppercase">1. Beneficiary Information</span>
-              <div className="h-6 bg-surface-container rounded mt-1 opacity-50 w-full"></div>
+        <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative text-left">
+          {/* Header */}
+          <div className="text-center border-b pb-2 border-[#e6dfd5]">
+            <span className="font-bold text-[10px] tracking-wider uppercase block text-[#8a6842]">GOVERNMENT OF INDIA</span>
+            <span className="text-[9px] text-[#8c7457] uppercase block">DEPARTMENT OF AGRICULTURE & COOPERATION</span>
+            <div className="font-bold text-xs uppercase underline mt-2 text-[#8a6842]">
+              PM-KISAN NEW FARMER REGISTRATION FORM
             </div>
+          </div>
+
+          {/* Photo Affix */}
+          <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80">
+            PASTE<br/>PHOTO
+          </div>
+
+          {/* Form Content */}
+          <div className="space-y-4 mt-4 pr-16">
             <div>
-              <span className="block text-xs font-semibold text-secondary uppercase">2. Landholding Details</span>
-              <div className="grid grid-cols-2 gap-4 mt-1">
-                <div className="h-6 bg-surface-container rounded opacity-50"></div>
-                <div className="h-6 bg-surface-container rounded opacity-50"></div>
+              <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
+                Section I — Farmer Profile
+              </span>
+              <div className="grid grid-cols-1 gap-2 pl-2">
+                <div>Name of Farmer: <span className="text-[#a48464] font-serif">........................................</span></div>
+                <div>Category: <span className="font-semibold">General / OBC</span></div>
               </div>
             </div>
+
             <div>
-              <span className="block text-xs font-semibold text-secondary uppercase">3. Banking & Aadhaar</span>
-              <div className="h-6 bg-surface-container rounded mt-1 opacity-50 w-3/4"></div>
+              <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
+                Section II — Land Details
+              </span>
+              <div className="grid grid-cols-1 gap-2 pl-2">
+                <div className="flex items-center">
+                  Owns Cultivable Land: &nbsp;&nbsp;
+                  <span className="inline-block w-4 h-4 border border-[#cbbca3] text-center rounded"></span> Yes &nbsp;&nbsp;&nbsp;
+                  <span className="inline-block w-4 h-4 border border-[#cbbca3] text-center rounded"></span> No
+                </div>
+                <div>Area of Land Owned: <span className="text-[#a48464] font-serif">..........</span> Acres</div>
+                <div>District Register: <span className="text-[#a48464] font-serif">........................</span></div>
+              </div>
             </div>
+
             <div>
-              <span className="block text-xs font-semibold text-secondary uppercase">4. District Registry</span>
-              <div className="h-6 bg-surface-container rounded mt-1 opacity-50 w-1/2"></div>
+              <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
+                Section III — Bank & Aadhaar Verification
+              </span>
+              <div className="grid grid-cols-1 gap-2 pl-2">
+                <div className="flex items-center">
+                  Aadhaar Linked Bank Account: &nbsp;&nbsp;
+                  <span className="inline-block w-4 h-4 border border-[#cbbca3] text-center rounded"></span> Yes &nbsp;&nbsp;&nbsp;
+                  <span className="inline-block w-4 h-4 border border-[#cbbca3] text-center rounded"></span> No
+                </div>
+              </div>
             </div>
           </div>
-          <div className="mt-8 border-t pt-4 border-outline-variant/30 text-center text-[10px] text-secondary">
-            GOVERNMENT OF INDIA • DEPARTMENT OF AGRICULTURE & FARMERS WELFARE
+
+          {/* Declaration and Signature */}
+          <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end">
+            <div className="w-1/2 text-[7.5px] leading-tight text-[#8c7457]">
+              * Verification checklist is evaluated automatically in real-time. Disqualification criteria checks apply.
+            </div>
+            <div className="text-center w-1/3">
+              <div className="border-t border-[#3c2f2f] w-full mt-4"></div>
+              <span className="text-[8px] font-bold">Farmer Signature</span>
+            </div>
           </div>
         </div>
       );
@@ -66,35 +102,58 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
 
     if (schemeId === "caste_cert") {
       return (
-        <div className="flex flex-col gap-6 text-on-surface/80">
-          <div className="text-center border-b pb-4 border-outline-variant/50">
-            <span className="material-symbols-outlined text-4xl text-primary mb-1">description</span>
-            <h4 className="font-bold text-lg text-primary">Caste Certificate</h4>
-            <span className="text-xs text-secondary tracking-widest uppercase">Declaration Form</span>
+        <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative text-left">
+          <div className="text-center border-b pb-2 border-[#e6dfd5]">
+            <span className="font-bold text-[10px] tracking-wider uppercase block text-[#8a6842]">REVENUE DEPARTMENT</span>
+            <span className="text-[9px] text-[#8c7457] uppercase block">APPLICATION FOR COMMUNITY STATUS</span>
+            <div className="font-bold text-xs uppercase underline mt-2 text-[#8a6842]">
+              FORM I: CASTE CERTIFICATE DECLARATION
+            </div>
           </div>
-          <div className="space-y-4">
+
+          <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80">
+            PASTE<br/>PHOTO
+          </div>
+
+          <div className="space-y-4 mt-4 pr-16">
             <div>
-              <span className="block text-xs font-semibold text-secondary uppercase">1. Personal Information</span>
-              <div className="h-6 bg-surface-container rounded mt-1 opacity-50 w-full"></div>
-            </div>
-            <div>
-              <span className="block text-xs font-semibold text-secondary uppercase">2. State of Residence</span>
-              <div className="h-6 bg-surface-container rounded mt-1 opacity-50 w-2/3"></div>
-            </div>
-            <div>
-              <span className="block text-xs font-semibold text-secondary uppercase">3. Caste Category & Sub-caste</span>
-              <div className="grid grid-cols-2 gap-4 mt-1">
-                <div className="h-6 bg-surface-container rounded opacity-50"></div>
-                <div className="h-6 bg-surface-container rounded opacity-50"></div>
+              <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
+                Section I — Applicant Profile
+              </span>
+              <div className="grid grid-cols-1 gap-2 pl-2">
+                <div>Name of Applicant: <span className="text-[#a48464] font-serif">........................................</span></div>
+                <div>State of Residence: <span className="text-[#a48464] font-serif">................................</span></div>
               </div>
             </div>
+
             <div>
-              <span className="block text-xs font-semibold text-secondary uppercase">4. Annual Household Income</span>
-              <div className="h-6 bg-surface-container rounded mt-1 opacity-50 w-1/2"></div>
+              <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
+                Section II — Caste Details
+              </span>
+              <div className="grid grid-cols-1 gap-2 pl-2">
+                <div>Caste Category (SC/ST/OBC): <span className="text-[#a48464] font-serif">................</span></div>
+                <div>Sub-Caste Name: <span className="text-[#a48464] font-serif">................................</span></div>
+              </div>
+            </div>
+
+            <div>
+              <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
+                Section III — Income Exclusions
+              </span>
+              <div className="grid grid-cols-1 gap-2 pl-2">
+                <div>Annual Household Income: Rs. <span className="text-[#a48464] font-serif">................</span></div>
+              </div>
             </div>
           </div>
-          <div className="mt-8 border-t pt-4 border-outline-variant/30 text-center text-[10px] text-secondary">
-            REVENUE DEPARTMENT • OFFICIAL CITIZENSHIP CERTIFICATION
+
+          <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end">
+            <div className="w-1/2 text-[7.5px] leading-tight text-[#8c7457]">
+              * Non-creamy layer verification is processed automatically based on state classifications.
+            </div>
+            <div className="text-center w-1/3">
+              <div className="border-t border-[#3c2f2f] w-full mt-4"></div>
+              <span className="text-[8px] font-bold">Applicant Signature</span>
+            </div>
           </div>
         </div>
       );
@@ -102,32 +161,49 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
 
     // Default: Income Certificate
     return (
-      <div className="flex flex-col gap-6 text-on-surface/80">
-        <div className="text-center border-b pb-4 border-outline-variant/50">
-          <span className="material-symbols-outlined text-4xl text-primary mb-1">account_balance_wallet</span>
-          <h4 className="font-bold text-lg text-primary">Income Certificate</h4>
-          <span className="text-xs text-secondary tracking-widest uppercase">Income Declaration</span>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <span className="block text-xs font-semibold text-secondary uppercase">1. Declarant Full Name</span>
-            <div className="h-6 bg-surface-container rounded mt-1 opacity-50 w-full"></div>
-          </div>
-          <div>
-            <span className="block text-xs font-semibold text-secondary uppercase">2. District & Location</span>
-            <div className="h-6 bg-surface-container rounded mt-1 opacity-50 w-3/4"></div>
-          </div>
-          <div>
-            <span className="block text-xs font-semibold text-secondary uppercase">3. Primary Occupation / Profession</span>
-            <div className="h-6 bg-surface-container rounded mt-1 opacity-50 w-full"></div>
-          </div>
-          <div>
-            <span className="block text-xs font-semibold text-secondary uppercase">4. Total Annual Household Earnings</span>
-            <div className="h-6 bg-surface-container rounded mt-1 opacity-50 w-1/2"></div>
+      <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative text-left">
+        <div className="text-center border-b pb-2 border-[#e6dfd5]">
+          <span className="font-bold text-[10px] tracking-wider uppercase block text-[#8a6842]">REVENUE DEPARTMENT</span>
+          <span className="text-[9px] text-[#8c7457] uppercase block">OFFICE OF THE TAHSILDAR</span>
+          <div className="font-bold text-xs uppercase underline mt-2 text-[#8a6842]">
+            INCOME STATUS DECLARATION FORM
           </div>
         </div>
-        <div className="mt-8 border-t pt-4 border-outline-variant/30 text-center text-[10px] text-secondary">
-          STATE REVENUE DEPARTMENT • TAXATION & WELFARE ASSESSMENT
+
+        <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80">
+          PASTE<br/>PHOTO
+        </div>
+
+        <div className="space-y-4 mt-4 pr-16">
+          <div>
+            <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
+              Section I — Declarant Details
+            </span>
+            <div className="grid grid-cols-1 gap-2 pl-2">
+              <div>Name of Declarant: <span className="text-[#a48464] font-serif">........................................</span></div>
+              <div>District Location: <span className="text-[#a48464] font-serif">................................</span></div>
+            </div>
+          </div>
+
+          <div>
+            <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
+              Section II — Occupation & Earnings
+            </span>
+            <div className="grid grid-cols-1 gap-2 pl-2">
+              <div>Primary Occupation: <span className="text-[#a48464] font-serif">........................................</span></div>
+              <div>Annual Declared Income: Rs. <span className="text-[#a48464] font-serif">................</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end">
+          <div className="w-1/2 text-[7.5px] leading-tight text-[#8c7457]">
+            * Declared income is verified against state income tax registries and land holdings.
+          </div>
+          <div className="text-center w-1/3">
+            <div className="border-t border-[#3c2f2f] w-full mt-4"></div>
+            <span className="text-[8px] font-bold">Declarant Signature</span>
+          </div>
         </div>
       </div>
     );
@@ -139,7 +215,6 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
       {analyzing && (
         <div className="fixed inset-0 bg-white/70 backdrop-blur-md z-50 flex flex-col items-center justify-center transition-all duration-300">
           <div className="relative flex items-center justify-center mb-6">
-            {/* Pulsing circular glow effects */}
             <div className="absolute w-24 h-24 rounded-full bg-primary/10 animate-ping"></div>
             <div className="absolute w-16 h-16 rounded-full bg-primary/20 animate-pulse"></div>
             <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin z-10"></div>
@@ -174,7 +249,7 @@ export default function PreviewScreen({ schemeId, schemeLabel, onProceed, onUplo
         </div>
 
         {/* Form Container */}
-        <div className="w-full max-w-sm mx-auto aspect-[1/1.3] bg-white border-2 border-dashed border-outline-variant/60 rounded-xl p-8 shadow-sm flex flex-col justify-between relative select-none hover:border-primary/50 transition-colors">
+        <div className="w-full max-w-sm mx-auto aspect-[1/1.3] bg-white border border-[#e6dfd5] rounded-xl p-4 shadow-md flex flex-col justify-between relative select-none hover:border-primary/50 transition-colors">
           {renderBlankFormMockup()}
         </div>
 
