@@ -24,6 +24,7 @@ export default function ChatScreen({
   isResumed,
   isComplete,
   onComplete,
+  taskLogs,
 }) {
   const { setScreen } = useLocation();
   const chatEndRef = useRef(null);
@@ -235,6 +236,7 @@ export default function ChatScreen({
           schemeName={schemeName}
           schemeId={schemeId}
           currentFieldIndex={currentFieldIndex}
+          taskLogs={taskLogs}
         />
 
         {/* Secure verification trust card */}

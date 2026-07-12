@@ -42,6 +42,34 @@ app = Workflows.from_workflows(
 )
 
 
+def log_task_execution(
+    workflow_id: str,
+    task_name: str,
+    status: str,
+    input_data: dict,
+    output_data: dict = None,
+    error: str = None
+) -> None:
+    """Log task execution state inside documents_collected using special prefix."""
+    import datetime
+    try:
+        supabase = get_supabase()
+        payload = {
+            "status": status,
+            "updated_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "input": input_data,
+            "output": output_data,
+            "error": error
+        }
+        supabase.table("documents_collected").upsert({
+            "workflow_instance_id": workflow_id,
+            "field_name": f"__task_log_{task_name}",
+            "field_value": payload
+        }, on_conflict="workflow_instance_id,field_name").execute()
+    except Exception as e:
+        print(f"Failed to log task execution for {task_name}: {e}")
+
+
 @app.task(
     retry=Retry(max_retries=2, wait_duration_ms=1000, backoff_scaling=1.5),
     timeout_seconds=120,
@@ -53,32 +81,7 @@ def run_setu_turn(
     scheme_id: str | None = None,
     existing_instance_id: str | None = None,
 ) -> dict[str, Any]:
-    """Top-level orchestrator: process one user utterance through the pipeline.
-
-    Called once per user utterance from setu-audio (via Render Workflow trigger).
-    Reads Supabase state to resume if an existing workflow instance is in progress.
-
-    When existing_instance_id is provided (from frontend session lookup), the
-    intake_task skips schema inference and directly resumes that workflow instance.
-
-    Task chain:
-        1. intake_task      — identify/resolve scheme, get/create workflow_instance
-        2. document_collection_task — extract field data from utterance
-        3. validation_task  — check eligibility (if all fields collected)
-        4. form_generation_task — produce filled PDF (if eligible)
-        5. notify_user_task — send download notification
-
-    Args:
-        user_id: The UUID of the user.
-        raw_utterance: The transcribed text from the user's spoken input.
-        scheme_id: Explicit scheme identifier (from frontend context).
-        existing_instance_id: Known workflow instance ID (from session lookup).
-
-    Returns:
-        dict with keys describing the outcome of this turn:
-            workflow_instance_id, scheme_id, current_stage, complete,
-            needs_reask, reask_prompt, resumed
-    """
+    """Top-level orchestrator: process one user utterance through the pipeline."""
     # Helper to call task raw function if not in Render execution context
     def _call(task_callable, *args, **kwargs):
         from render_sdk.workflows.task import _current_client
@@ -99,19 +102,76 @@ def run_setu_turn(
     scheme_id = instance["scheme_id"]
     is_resume = instance.get("resumed", False)
 
-    # Step 2: Document collection — extract field data
-    collection_result = _call(
-        document_collection_task,
+    # Log Step 1 Intake success
+    log_task_execution(
         workflow_id,
-        raw_utterance,
-        is_resume=is_resume,
+        "intake",
+        "SUCCESS",
+        {
+            "user_id": user_id,
+            "raw_utterance": raw_utterance,
+            "scheme_id": scheme_id,
+            "existing_instance_id": existing_instance_id,
+        },
+        instance,
     )
+
+    # Step 2: Document collection — extract field data
+    log_task_execution(
+        workflow_id,
+        "document_collection",
+        "RUNNING",
+        {"raw_utterance": raw_utterance},
+    )
+    try:
+        collection_result = _call(
+            document_collection_task,
+            workflow_id,
+            raw_utterance,
+            is_resume=is_resume,
+        )
+        log_task_execution(
+            workflow_id,
+            "document_collection",
+            "SUCCESS",
+            {"raw_utterance": raw_utterance},
+            collection_result,
+        )
+    except Exception as e:
+        log_task_execution(
+            workflow_id,
+            "document_collection",
+            "FAILED",
+            {"raw_utterance": raw_utterance},
+            error=str(e),
+        )
+        raise e
 
     collected_fields = collection_result.get("collected_fields", {})
 
+    # Helper to clean up fields and inject logs before exit
+    def _finalize_result(res_dict: dict[str, Any]) -> dict[str, Any]:
+        try:
+            supabase = get_supabase()
+            db_fields = (
+                supabase.table("documents_collected")
+                .select("field_name, field_value")
+                .eq("workflow_instance_id", workflow_id)
+                .execute()
+            )
+            for row in db_fields.data:
+                if row["field_name"].startswith("__task_log_"):
+                    res_dict["collected_fields"][row["field_name"]] = row["field_value"]
+        except Exception as e:
+            print(f"Failed to merge final task logs: {e}")
+        return res_dict
+
     # If collection is still in progress and needs user input, return early
     if collection_result.get("needs_reask") or not collection_result.get("complete"):
-        return {
+        log_task_execution(workflow_id, "validation", "PENDING", {})
+        log_task_execution(workflow_id, "form_generation", "PENDING", {})
+        log_task_execution(workflow_id, "notify_user", "PENDING", {})
+        return _finalize_result({
             "workflow_instance_id": workflow_id,
             "scheme_id": scheme_id,
             "current_stage": "document_collection",
@@ -120,15 +180,22 @@ def run_setu_turn(
             "reask_prompt": collection_result.get("reask_prompt"),
             "resumed": is_resume,
             "collected_fields": collected_fields,
-        }
+        })
 
     # Step 3: Validation — check eligibility
-    validation_result = _call(validation_task, workflow_id)
+    log_task_execution(workflow_id, "validation", "RUNNING", {})
+    try:
+        validation_result = _call(validation_task, workflow_id)
+        status = "SUCCESS" if validation_result.get("eligible", False) else "FAILED"
+        log_task_execution(
+            workflow_id, "validation", status, {}, validation_result
+        )
+    except Exception as e:
+        log_task_execution(workflow_id, "validation", "FAILED", {}, error=str(e))
+        raise e
 
     if not validation_result.get("eligible", False):
         # Update the workflow instance status to 'completed' in Supabase
-        # so that it is no longer marked as 'in_progress', allowing the user
-        # to start a new application for this scheme.
         from supabase_client import get_supabase
         try:
             supabase = get_supabase()
@@ -138,7 +205,9 @@ def run_setu_turn(
         except Exception as e:
             print(f"Failed to update workflow instance status on validation failure: {e}")
 
-        return {
+        log_task_execution(workflow_id, "form_generation", "PENDING", {})
+        log_task_execution(workflow_id, "notify_user", "PENDING", {})
+        return _finalize_result({
             "workflow_instance_id": workflow_id,
             "scheme_id": scheme_id,
             "current_stage": "validation_failed",
@@ -147,21 +216,47 @@ def run_setu_turn(
             "failed_reasons": validation_result.get("failed_reasons", []),
             "resumed": is_resume,
             "collected_fields": collected_fields,
-        }
+        })
 
     # Step 4: Form generation — produce PDF
-    form_result = _call(form_generation_task, workflow_id)
+    log_task_execution(workflow_id, "form_generation", "RUNNING", {})
+    try:
+        form_result = _call(form_generation_task, workflow_id)
+        log_task_execution(
+            workflow_id, "form_generation", "SUCCESS", {}, form_result
+        )
+    except Exception as e:
+        log_task_execution(
+            workflow_id, "form_generation", "FAILED", {}, error=str(e)
+        )
+        raise e
     pdf_storage_path = form_result.get("pdf_storage_path")
 
-    # Step 5: Notify — send confirmation (pass storage path from form generation)
-    notify_result = _call(
-        notify_user_task,
-        workflow_id,
-        channel="voice",
-        pdf_storage_path=pdf_storage_path,
+    # Step 5: Notify — send confirmation
+    log_task_execution(
+        workflow_id, "notify_user", "RUNNING", {"channel": "voice"}
     )
+    try:
+        notify_result = _call(
+            notify_user_task,
+            workflow_id,
+            channel="voice",
+            pdf_storage_path=pdf_storage_path,
+        )
+        log_task_execution(
+            workflow_id,
+            "notify_user",
+            "SUCCESS",
+            {"channel": "voice"},
+            notify_result,
+        )
+    except Exception as e:
+        log_task_execution(
+            workflow_id, "notify_user", "FAILED", {"channel": "voice"}, error=str(e)
+        )
+        raise e
 
-    return {
+    return _finalize_result({
         "workflow_instance_id": workflow_id,
         "scheme_id": scheme_id,
         "current_stage": "notified",
@@ -173,7 +268,7 @@ def run_setu_turn(
         "notification_message": notify_result.get("message", ""),
         "download_url": notify_result.get("pdf_url", ""),
         "collected_fields": collected_fields,
-    }
+    })
 
 
 # Entry point for Render Workflow worker

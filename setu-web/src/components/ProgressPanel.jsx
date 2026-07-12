@@ -1,8 +1,8 @@
 import { useState } from "react";
 import FieldItem from "./FieldItem";
 
-export default function ProgressPanel({ fields, schemeName, schemeId, currentFieldIndex }) {
-  const [viewMode, setViewMode] = useState("form"); // "form" | "checklist"
+export default function ProgressPanel({ fields, schemeName, schemeId, currentFieldIndex, taskLogs = {} }) {
+  const [viewMode, setViewMode] = useState("form"); // "form" | "checklist" | "engine"
   
   const total = fields.length;
   const completed = fields.filter(
@@ -104,6 +104,14 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
       </span>
     );
   };
+
+  const tasksList = [
+    { id: "intake", name: "Task 1: Intake", icon: "login", desc: "Identifies scheme intent & initializes workflow state." },
+    { id: "document_collection", name: "Task 2: Document Collection", icon: "quickref", desc: "Extracts form values from voice transcripts in real-time." },
+    { id: "validation", name: "Task 3: Eligibility Rules Validation", icon: "rule", desc: "Evaluates criteria constraints and checks qualifications." },
+    { id: "form_generation", name: "Task 4: Template Generation", icon: "picture_as_pdf", desc: "Compiles a verified PDF document using Jinja2 templates." },
+    { id: "notify_user", name: "Task 5: User Notification", icon: "notifications_active", desc: "Dispatches the download links & triggers final confirmation." }
+  ];
 
   // Render high-fidelity government form mockup
   const renderLiveForm = () => {
@@ -331,23 +339,33 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
       <div className="bg-surface-container-high rounded-full p-1.5 flex gap-1 mb-5 shrink-0 border border-surface-variant/30">
         <button
           onClick={() => setViewMode("form")}
-          className={`flex-1 py-2 rounded-full text-xs font-semibold transition-all ${
+          className={`flex-1 py-1.5 rounded-full text-[11px] font-bold transition-all ${
             viewMode === "form"
               ? "bg-primary text-white shadow-sm"
               : "text-secondary hover:text-primary"
           }`}
         >
-          Live Form Preview
+          Form Preview
         </button>
         <button
           onClick={() => setViewMode("checklist")}
-          className={`flex-1 py-2 rounded-full text-xs font-semibold transition-all ${
+          className={`flex-1 py-1.5 rounded-full text-[11px] font-bold transition-all ${
             viewMode === "checklist"
               ? "bg-primary text-white shadow-sm"
               : "text-secondary hover:text-primary"
           }`}
         >
-          Steps Checklist
+          Checklist
+        </button>
+        <button
+          onClick={() => setViewMode("engine")}
+          className={`flex-1 py-1.5 rounded-full text-[11px] font-bold transition-all ${
+            viewMode === "engine"
+              ? "bg-primary text-white shadow-sm"
+              : "text-secondary hover:text-primary"
+          }`}
+        >
+          Workflow Engine
         </button>
       </div>
 
@@ -363,8 +381,8 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
 
       {/* Panel Body */}
       <div className="flex-grow flex flex-col relative min-h-[480px] overflow-hidden">
-        {/* Active Step Criteria */}
-        {activeField && activeField.criteria && (
+        {/* Active Step Criteria (Only show when not in engine mode) */}
+        {viewMode !== "engine" && activeField && activeField.criteria && (
           <div className="bg-[#fffbeb] border border-[#fef3c7] p-3 rounded-xl text-left shadow-sm flex items-start gap-2.5 mb-4 shrink-0">
             <span className="material-symbols-outlined text-[#d97706] text-[18px] shrink-0 mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>
               info_i
@@ -378,8 +396,8 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
           </div>
         )}
 
-        {/* Disqualification Warning */}
-        {disqualificationWarning && (
+        {/* Disqualification Warning (Only show when not in engine mode) */}
+        {viewMode !== "engine" && disqualificationWarning && (
           <div className="bg-[#fef2f2] border border-[#fee2e2] p-3 rounded-xl text-left shadow-sm flex items-start gap-2.5 mb-4 shrink-0">
             <span className="material-symbols-outlined text-[#dc2626] text-[18px] shrink-0 mt-0.5 animate-bounce" style={{ fontVariationSettings: "'FILL' 1" }}>
               warning
@@ -393,11 +411,13 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
           </div>
         )}
 
-        {viewMode === "form" ? (
+        {viewMode === "form" && (
           <div className="flex-1 w-full relative">
             {renderLiveForm()}
           </div>
-        ) : (
+        )}
+
+        {viewMode === "checklist" && (
           <div className="flex-grow overflow-y-auto pr-1 custom-scrollbar">
             {fields.length > 0 ? (
               <ul className="flex flex-col gap-5">
@@ -416,6 +436,108 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
                 Select a scheme to begin...
               </p>
             )}
+          </div>
+        )}
+
+        {viewMode === "engine" && (
+          <div className="flex-grow overflow-y-auto pr-1 custom-scrollbar text-left pb-6 select-text">
+            <div className="bg-[#f0f4f9] border border-blue-100 rounded-xl p-3.5 mb-5 flex gap-2">
+              <span className="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5 animate-pulse" style={{ fontVariationSettings: "'FILL' 1" }}>
+                settings_breathe
+              </span>
+              <div>
+                <h4 className="font-bold text-xs text-primary">Render Workflows Live Engine</h4>
+                <p className="text-[10px] text-secondary mt-0.5 leading-relaxed">
+                  This panel reports real-time logs, runtime state, and task inputs/outputs to satisfy hackathon scoring criteria.
+                </p>
+              </div>
+            </div>
+
+            <div className="relative border-l-2 border-primary/20 pl-4 ml-3.5 space-y-6 mt-4">
+              {tasksList.map((task) => {
+                const log = taskLogs[task.id];
+                const status = log ? log.status : "PENDING";
+                const time = log ? new Date(log.updated_at).toLocaleTimeString() : null;
+                
+                // Style mappings based on status
+                let bulletColor = "bg-[#f8f9ff] border-primary/30";
+                let textColor = "text-on-surface/40";
+                let badgeStyle = "bg-surface-container text-on-surface-variant/70 border border-surface-variant/40";
+                
+                if (status === "RUNNING") {
+                  bulletColor = "bg-[#d97706] border-[#fef3c7] animate-pulse scale-110";
+                  textColor = "text-[#d97706] font-bold";
+                  badgeStyle = "bg-[#fef3c7] text-[#92400e] border border-[#fde68a]";
+                } else if (status === "SUCCESS") {
+                  bulletColor = "bg-[#16a34a] border-[#dcfce7] scale-110";
+                  textColor = "text-on-surface font-semibold";
+                  badgeStyle = "bg-[#dcfce7] text-[#15803d] border border-[#bbf7d0]";
+                } else if (status === "FAILED") {
+                  bulletColor = "bg-[#dc2626] border-[#fee2e2] scale-110";
+                  textColor = "text-[#dc2626] font-bold";
+                  badgeStyle = "bg-[#fee2e2] text-[#991b1b] border border-[#fecaca]";
+                }
+                
+                return (
+                  <div key={task.id} className="relative">
+                    {/* Timeline Node Icon/Dot */}
+                    <div className={`absolute -left-[23.5px] top-1.5 w-3.5 h-3.5 rounded-full border-2 ${bulletColor} z-10 shadow-sm transition-all duration-300`} />
+                    
+                    {/* Task Title & Status */}
+                    <div className="flex justify-between items-start gap-2">
+                      <div>
+                        <h4 className={`text-[12px] font-bold ${textColor} flex items-center gap-1.5`}>
+                          <span className="material-symbols-outlined text-[15px]">{task.icon}</span>
+                          {task.name}
+                        </h4>
+                        <p className="text-[10px] text-secondary mt-0.5">{task.desc}</p>
+                      </div>
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${badgeStyle}`}>
+                        {status}
+                      </span>
+                    </div>
+                    
+                    {/* Time & Payload */}
+                    {log && (
+                      <div className="mt-2.5 ml-1 bg-[#fafafc] border border-surface-variant/40 rounded-lg p-2.5 text-[9px] shadow-sm select-text">
+                        <div className="flex justify-between text-[8px] text-secondary border-b border-surface-variant/20 pb-1.5 mb-2 uppercase font-bold tracking-wider">
+                          <span>Execution Timestamp</span>
+                          <span>{time}</span>
+                        </div>
+                        
+                        {/* Input Args */}
+                        {log.input && Object.keys(log.input).length > 0 && (
+                          <div className="mb-2">
+                            <span className="block font-bold text-secondary uppercase text-[7px] tracking-wide mb-0.5">Input Arguments:</span>
+                            <pre className="bg-[#1e1e24] text-[#a9b1d6] p-1.5 rounded text-[8px] font-mono overflow-x-auto max-w-full leading-tight">
+                              {JSON.stringify(log.input, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                        
+                        {/* Output Args */}
+                        {log.output && Object.keys(log.output).length > 0 && (
+                          <div className="mb-2">
+                            <span className="block font-bold text-secondary uppercase text-[7px] tracking-wide mb-0.5">Output Data:</span>
+                            <pre className="bg-[#1e1e24] text-[#a9b1d6] p-1.5 rounded text-[8px] font-mono overflow-x-auto max-w-full leading-tight">
+                              {JSON.stringify(log.output, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                        
+                        {/* Error detail */}
+                        {log.error && (
+                          <div className="mt-1.5 bg-red-50 text-[#dc2626] p-2 rounded border border-red-100 leading-normal">
+                            <span className="font-bold text-[7.5px] block uppercase mb-0.5">Error details:</span>
+                            <span className="font-mono text-[8px] font-semibold">{log.error}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

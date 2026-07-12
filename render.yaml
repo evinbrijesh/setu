@@ -1,0 +1,53 @@
+# Render Blueprint Specification (render.yaml)
+# ==========================================
+# Deploys the complete Setu Voice AI Agent pipeline on Render:
+# 1. setu-audio (FastAPI Web Socket service with Docker)
+# 2. setu-web   (React static frontend)
+#
+# To deploy: Go to Render Dashboard -> Blueprints -> New Blueprint Instance -> Select repository.
+
+services:
+  # 1. FastAPI Audio Bridge & Webhook Service
+  - type: web
+    name: setu-audio
+    env: docker
+    dockerContext: .
+    dockerfilePath: setu-audio/Dockerfile
+    plan: standard
+    envVars:
+      - key: ENABLE_FALLBACKS
+        value: "true"
+      - key: SARVAM_API_KEY
+        sync: false
+        placeholder: "Your Sarvam AI API Key"
+      - key: GEMINI_API_KEY
+        sync: false
+        placeholder: "Your Google AI Studio API Key"
+      - key: SUPABASE_URL
+        sync: false
+        placeholder: "Your Supabase project URL"
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+        placeholder: "Your Supabase Service Role Key (Keep private)"
+      - key: RENDER_API_KEY
+        sync: false
+        placeholder: "Your Render API Key (for trigger validation)"
+      - key: RENDER_WORKFLOWS_TRIGGER_URL
+        sync: false
+        placeholder: "Your Render Workflows Trigger Webhook URL"
+
+  # 2. React static frontend web app
+  - type: web
+    name: setu-web
+    env: static
+    buildCommand: cd setu-web && npm install && npm run build
+    publishPath: setu-web/dist
+    envVars:
+      - key: VITE_AUDIO_WS_URL
+        placeholder: "wss://setu-audio.onrender.com/ws/audio"
+      - key: VITE_SUPABASE_URL
+        sync: false
+        placeholder: "Your Supabase URL"
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+        placeholder: "Your Supabase Public Anon Key"

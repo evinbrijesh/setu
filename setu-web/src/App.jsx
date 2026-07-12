@@ -47,6 +47,7 @@ const INCOME_FIELDS = [
 export default function App() {
   // Screen routing: 'welcome' | 'services' | 'history' | 'chat' | 'complete' | 'preview'
   const [screen, setScreen] = useState("welcome");
+  const [taskLogs, setTaskLogs] = useState({});
 
   // Selected scheme context (used during preview stage)
   const [selectedSchemeId, setSelectedSchemeId] = useState("pm_kisan");
@@ -335,6 +336,19 @@ export default function App() {
       setWorkflowInstanceId(state.workflow_instance_id);
       localStorage.setItem("setu_workflow_id", state.workflow_instance_id);
     }
+    if (state.collected_fields) {
+      // Extract task logs
+      const logs = {};
+      Object.keys(state.collected_fields).forEach((key) => {
+        if (key.startsWith("__task_log_")) {
+          const taskName = key.replace("__task_log_", "");
+          logs[taskName] = state.collected_fields[key];
+        }
+      });
+      if (Object.keys(logs).length > 0) {
+        setTaskLogs((prev) => ({ ...prev, ...logs }));
+      }
+    }
     if (state.current_stage) {
       // Update fields based on collected_fields
       if (state.collected_fields) {
@@ -465,6 +479,18 @@ export default function App() {
             .eq("workflow_instance_id", storedWorkflowId)
             .then(({ data, error }) => {
               if (data && !error) {
+                // Populate task logs
+                const logs = {};
+                data.forEach((row) => {
+                  if (row.field_name.startsWith("__task_log_")) {
+                    const taskName = row.field_name.replace("__task_log_", "");
+                    logs[taskName] = row.field_value;
+                  }
+                });
+                if (Object.keys(logs).length > 0) {
+                  setTaskLogs(logs);
+                }
+
                 setFields((prev) =>
                   prev.map((f) => {
                     const match = data.find((row) => row.field_name === f.name);
@@ -572,6 +598,7 @@ export default function App() {
             isResumed={isResumed}
             isComplete={isComplete}
             onComplete={handleComplete}
+            taskLogs={taskLogs}
           />
         )}
 
