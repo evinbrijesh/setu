@@ -96,8 +96,8 @@ def extract_field(
 
 
 def _call_gemini_fallback(system_prompt: str, user_prompt: str, gemini_key: str) -> str | None:
-    """Call Google AI Studio's Gemini 2.5 Flash in JSON mode."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
+    """Call Google AI Studio's Gemini 2.0 Flash in JSON mode."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
     payload = {
         "contents": [{
             "role": "user",
