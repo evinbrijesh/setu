@@ -130,8 +130,28 @@ export default function App() {
   }, [selectedSchemeId, selectedSchemeLabel]);
 
   const handleUploadAndProcess = useCallback((file) => {
-    const schemeId = selectedSchemeId;
-    const name = selectedSchemeLabel;
+    const fileNameLower = file.name.toLowerCase();
+    
+    let schemeId = selectedSchemeId;
+    let name = selectedSchemeLabel;
+    
+    // Auto-detect and switch certificate scheme based on the uploaded document filename
+    if (fileNameLower.includes("caste") || fileNameLower.includes("community")) {
+      schemeId = "caste_cert";
+      name = "Caste Certificate";
+      setSelectedSchemeId("caste_cert");
+      setSelectedSchemeLabel("Caste Certificate");
+    } else if (fileNameLower.includes("income") || fileNameLower.includes("salary") || fileNameLower.includes("tax")) {
+      schemeId = "income_cert";
+      name = "Income Certificate";
+      setSelectedSchemeId("income_cert");
+      setSelectedSchemeLabel("Income Certificate");
+    } else if (fileNameLower.includes("kisan") || fileNameLower.includes("farmer") || fileNameLower.includes("agriculture")) {
+      schemeId = "pm_kisan";
+      name = "PM Kisan Eligibility";
+      setSelectedSchemeId("pm_kisan");
+      setSelectedSchemeLabel("PM Kisan Eligibility");
+    }
     
     // Define pre-populated data based on scheme
     let extractedData = {};

@@ -74,18 +74,18 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
   const renderLiveForm = () => {
     if (schemeId === "pm_kisan") {
       return (
-        <div className="border-4 border-double border-on-surface p-4 flex flex-col justify-between text-[11px] bg-white dark:bg-on-background text-on-surface h-full w-full rounded-md shadow-inner select-none overflow-y-auto">
+        <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative">
           {/* Header */}
-          <div className="text-center border-b pb-2 border-outline-variant/60">
-            <span className="font-bold text-[10px] tracking-wider uppercase block">GOVERNMENT OF INDIA</span>
-            <span className="text-[9px] text-secondary uppercase block">DEPARTMENT OF AGRICULTURE & COOPERATION</span>
-            <div className="font-bold text-xs uppercase underline mt-2">
+          <div className="text-center border-b pb-2 border-[#e6dfd5]">
+            <span className="font-bold text-[10px] tracking-wider uppercase block text-[#8a6842]">GOVERNMENT OF INDIA</span>
+            <span className="text-[9px] text-[#8c7457] uppercase block">DEPARTMENT OF AGRICULTURE & COOPERATION</span>
+            <div className="font-bold text-xs uppercase underline mt-2 text-[#8a6842]">
               PM-KISAN NEW FARMER REGISTRATION FORM
             </div>
           </div>
 
           {/* Photo Affix */}
-          <div className="absolute top-16 right-6 border border-dashed border-outline w-16 h-20 flex items-center justify-center text-center text-[7px] text-secondary bg-surface-container-lowest">
+          <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80">
             PASTE<br/>PHOTO
           </div>
 
@@ -146,22 +146,23 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
 
     if (schemeId === "caste_cert") {
       return (
-        <div className="border-4 border-double border-on-surface p-4 flex flex-col justify-between text-[11px] bg-white dark:bg-on-background text-on-surface h-full w-full rounded-md shadow-inner select-none overflow-y-auto">
-          <div className="text-center border-b pb-2 border-outline-variant/60">
-            <span className="font-bold text-[10px] tracking-wider uppercase block">REVENUE DEPARTMENT</span>
-            <span className="text-[9px] text-secondary uppercase block">APPLICATION FOR COMMUNITY STATUS</span>
-            <div className="font-bold text-xs uppercase underline mt-2">
+        <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative">
+          <div className="text-center border-b pb-2 border-[#e6dfd5]">
+            <span className="font-bold text-[10px] tracking-wider uppercase block text-[#8a6842]">REVENUE DEPARTMENT</span>
+            <span className="text-[9px] text-[#8c7457] uppercase block">APPLICATION FOR COMMUNITY STATUS</span>
+            <div className="font-bold text-xs uppercase underline mt-2 text-[#8a6842]">
               FORM I: CASTE CERTIFICATE DECLARATION
             </div>
           </div>
 
-          <div className="absolute top-16 right-6 border border-dashed border-outline w-16 h-20 flex items-center justify-center text-center text-[7px] text-secondary bg-surface-container-lowest">
+          {/* Photo Affix */}
+          <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80">
             PASTE<br/>PHOTO
           </div>
 
           <div className="space-y-4 mt-4 pr-16">
             <div>
-              <span className="font-bold uppercase tracking-tight block text-secondary text-[9px] mb-1">
+              <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
                 Section I — Applicant Profile
               </span>
               <div className="grid grid-cols-1 gap-2 pl-2">
@@ -171,7 +172,7 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
             </div>
 
             <div>
-              <span className="font-bold uppercase tracking-tight block text-secondary text-[9px] mb-1">
+              <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
                 Section II — Caste Details
               </span>
               <div className="grid grid-cols-1 gap-2 pl-2">
@@ -181,7 +182,7 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
             </div>
 
             <div>
-              <span className="font-bold uppercase tracking-tight block text-secondary text-[9px] mb-1">
+              <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
                 Section III — Income Exclusions
               </span>
               <div className="grid grid-cols-1 gap-2 pl-2">
@@ -190,12 +191,12 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
             </div>
           </div>
 
-          <div className="mt-6 border-t pt-2 border-outline-variant/30 flex justify-between items-end">
-            <div className="w-1/2 text-[7.5px] leading-tight text-secondary">
+          <div className="mt-6 border-t pt-2 border-[#e6dfd5] flex justify-between items-end">
+            <div className="w-1/2 text-[7.5px] leading-tight text-[#8c7457]">
               * Non-creamy layer verification is processed automatically based on state classifications.
             </div>
             <div className="text-center w-1/3">
-              <div className="border-t border-on-surface w-full mt-4"></div>
+              <div className="border-t border-[#3c2f2f] w-full mt-4"></div>
               <span className="text-[8px] font-bold">Applicant Signature</span>
             </div>
           </div>
@@ -205,22 +206,23 @@ export default function ProgressPanel({ fields, schemeName, schemeId, currentFie
 
     // Default: Income Certificate
     return (
-      <div className="border-4 border-double border-on-surface p-4 flex flex-col justify-between text-[11px] bg-white dark:bg-on-background text-on-surface h-full w-full rounded-md shadow-inner select-none overflow-y-auto">
-        <div className="text-center border-b pb-2 border-outline-variant/60">
-          <span className="font-bold text-[10px] tracking-wider uppercase block">REVENUE DEPARTMENT</span>
-          <span className="text-[9px] text-secondary uppercase block">OFFICE OF THE TAHSILDAR</span>
-          <div className="font-bold text-xs uppercase underline mt-2">
+      <div className="border-4 border-double border-[#8a6842] p-4 flex flex-col justify-between text-[11px] bg-[#fcfaf5] text-[#3c2f2f] h-full w-full rounded-md shadow-inner select-none overflow-y-auto relative">
+        <div className="text-center border-b pb-2 border-[#e6dfd5]">
+          <span className="font-bold text-[10px] tracking-wider uppercase block text-[#8a6842]">REVENUE DEPARTMENT</span>
+          <span className="text-[9px] text-[#8c7457] uppercase block">OFFICE OF THE TAHSILDAR</span>
+          <div className="font-bold text-xs uppercase underline mt-2 text-[#8a6842]">
             INCOME STATUS DECLARATION FORM
           </div>
         </div>
 
-        <div className="absolute top-16 right-6 border border-dashed border-outline w-16 h-20 flex items-center justify-center text-center text-[7px] text-secondary bg-surface-container-lowest">
+        {/* Photo Affix */}
+        <div className="absolute top-16 right-6 border border-dashed border-[#cbbca3] w-16 h-20 flex items-center justify-center text-center text-[7px] text-[#8c7457] bg-[#fcfaf5]/80">
           PASTE<br/>PHOTO
         </div>
 
         <div className="space-y-4 mt-4 pr-16">
           <div>
-            <span className="font-bold uppercase tracking-tight block text-secondary text-[9px] mb-1">
+            <span className="font-bold uppercase tracking-tight block text-[#8c7457] text-[9px] mb-1">
               Section I — Declarant Details
             </span>
             <div className="grid grid-cols-1 gap-2 pl-2">

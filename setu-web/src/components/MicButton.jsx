@@ -56,7 +56,7 @@ export default function MicButton({
             break;
         }
       } else {
-        const blob = new Blob([event.data], { type: "audio/wav" });
+        const blob = new Blob([event.data]);
         onAudioResponse?.(blob);
       }
     };

@@ -91,7 +91,7 @@ export default function ChatScreen({
           handleSessionState(msg);
         }
       } else {
-        const blob = new Blob([event.data], { type: "audio/wav" });
+        const blob = new Blob([event.data]);
         onAudioResponse?.(blob);
         ws.close();
       }
