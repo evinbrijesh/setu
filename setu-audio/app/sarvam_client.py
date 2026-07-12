@@ -66,8 +66,8 @@ async def transcribe_audio(
 
 
 def _call_gemini_stt_fallback(audio_bytes: bytes, gemini_key: str) -> str:
-    """Call Google AI Studio's Gemini 1.5 Flash to transcribe inline audio bytes."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+    """Call Google AI Studio's Gemini 2.5 Flash to transcribe inline audio bytes."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
     
     # Base64 encode the WAV audio bytes for inline multimodal input
     audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
