@@ -44,6 +44,7 @@ RUN pip install --no-cache-dir -r /app/setu-audio/requirements.txt \
 
 # PYTHONPATH lets setu-audio import setu-workflows.main directly
 ENV PYTHONPATH=/app/setu-workflows:$PYTHONPATH
+ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
