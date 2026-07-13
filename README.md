@@ -104,10 +104,30 @@ Setu is a dual-track submission:
 - ✅ Automatic eligibility validation against scheme-specific rules
 - ✅ Automatic generation of a real, downloadable, filled PDF at the end of the process
 - ✅ Live progress visibility ("Step 3 of 5 complete") and a visible, config-driven form-preview panel
-- ✅ Config-driven scheme support — adding a new government program requires only a JSON config file and a PDF template, zero new orchestration code
+- ✅ Config-driven scheme support — 3 schemes shipped (PM Kisan, Caste Certificate, Income Certificate); adding a new government program requires only a JSON config file and a PDF template, zero new orchestration code
 - ✅ Live Render Dashboard visibility showing real stage-by-stage progress of each task pipeline run
+- ✅ Audio-reactive rings and live transcript display while speaking
+- ✅ Language selector — Hindi, Tamil, and Hinglish supported
+- ✅ Resumed-session indicator showing when a conversation is being picked up from a previous session
+- ✅ Text input mode — send typed utterances without a microphone (useful for demos and testing)
+- ✅ Demo PDF generation — hit `/api/form/mock-kisan-123` (or `mock-caste-123`, `mock-income-123`) to see a generated form without running the full pipeline
 
 *(Add screenshots/GIFs of the mic interaction, live transcript, and form-preview panel here before submission.)*
+
+### Screenshots
+
+<!-- Replace captions below with accurate descriptions once you've verified which image is which -->
+![Application UI](./output/images/Pasted%20image.png)
+*Setu — voice-driven interface with live transcript and form preview*
+
+![Conversation flow](./output/images/Pasted%20image%20(2).png)
+*Multi-turn conversation collecting document details*
+
+![Form preview panel](./output/images/Pasted%20image%20(3).png)
+*Config-driven form preview showing collected fields*
+
+![Dashboard / Render view](./output/images/screenshot-2026-07-13_22-24-26.png)
+*Render Dashboard showing stage-by-stage task pipeline progress*
 
 ---
 
@@ -145,8 +165,8 @@ Setu is a dual-track submission:
 ### Step 0: Clone and prepare config
 
 ```bash
-git clone https://github.com/evinbrijesh/<repo-name>.git
-cd <repo-name>
+git clone https://github.com/evinbrijesh/setu.git
+cd setu
 ```
 
 Each service has an `.env.example` you must copy and fill in:
@@ -161,9 +181,11 @@ cp setu-web/.env.example setu-web/.env        # edit with your keys
 
 | File | Variables to fill |
 |------|-------------------|
-| `setu-audio/.env` | `SARVAM_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (Render keys optional until deployment) |
-| `setu-workflows/.env` | `SARVAM_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
+| `setu-audio/.env` | `SARVAM_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RENDER_WORKFLOWS_TRIGGER_URL`, `RENDER_API_KEY` |
+| `setu-workflows/.env` | `SARVAM_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RENDER_API_KEY` |
 | `setu-web/.env` | `VITE_AUDIO_WS_URL=ws://localhost:8000/ws/audio`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+
+> **Fallback mode (optional):** Set `ENABLE_FALLBACKS=true` and `GEMINI_API_KEY` in `setu-audio/.env` to use Gemini for STT and gTTS for TTS when the Sarvam API is unavailable or rate-limited. This is useful for demos when you want a safety net. For `CORS_ORIGINS` (comma-separated), the defaults are `http://localhost:5173,http://localhost:4173` — only change if deploying the frontend at a different origin.
 
 ### One-Command Paths (after initial config)
 
@@ -212,6 +234,8 @@ python test_pipeline.py
 
 Expected output: a full trace of intake → document_collection (5 turns) → validation → form_generation → notify_user, ending with a signed PDF download URL. This proves Sarvam API + Supabase are wired correctly.
 
+> **Individual component tests** are also available in `setu-audio/`: `test_stt.py` (STT transcription), `test_ws.py` (WebSocket connectivity), `test_db_logs.py` / `test_db_tables.py` (Supabase writes), and `test_pdf_exist.py` (PDF generation). Run them individually to isolate issues.
+
 ### Step 3: Start the voice bridge (setu-audio)
 
 ```bash
@@ -252,6 +276,29 @@ Browser mic → setu-web (React, localhost:5173)
 
 In local dev mode, `setu-audio` imports `setu-workflows.main.run_setu_turn` directly (no Render Cloud API needed). For production, `setu-audio` POSTs to the Render Workflow trigger URL instead.
 
+### REST API Endpoints (`setu-audio`)
+
+In addition to the WebSocket, `setu-audio` exposes these HTTP endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Health check — returns `{"status":"ok"}` |
+| `GET` | `/api/session/{user_id}/{scheme_id}` | Look up existing in-progress workflow instance |
+| `GET` | `/api/form/{workflow_instance_id}` | Get signed PDF download URL for a completed form |
+| `GET` | `/api/history/{user_id}` | List all workflow instances for a user |
+| `GET` | `/api/session/{workflow_instance_id}/messages` | Fetch conversation log for a session |
+| `POST` | `/api/session/prepopulate` | Pre-fill document fields (for OCR/simulated upload) |
+
+### Testing without a microphone
+
+The WebSocket also accepts **text utterances** — send a JSON control frame to skip audio entirely:
+
+```json
+{ "type": "text_utterance", "text": "मुझे पीएम किसान योजना में आवेदन करना है" }
+```
+
+This is useful for testing the full pipeline without a working microphone or Sarvam STT.
+
 ### (Optional) Step 5: Run the resumability test
 
 ```bash
@@ -264,6 +311,10 @@ python test_pipeline.py
 
 ### (Optional) Step 6: Deploy to Render
 
+**Option A — Render Blueprint (fastest):**
+A `render.yaml` Blueprint is included in the repo. Go to Render Dashboard → Blueprints → New Blueprint Instance → select this repository. It provisions `setu-audio` (Docker Web Service) and `setu-web` (static site) automatically. You'll still need to set env vars manually (Sarvam key, Supabase creds, Render API key) in the Render Dashboard.
+
+**Option B — Manual deploy:**
 1. Push `setu-workflows/` as a connected GitHub repo to Render as a **Workflow service**
 2. Set the start command to `python main.py` and plan to at least Standard
 3. After deploy, copy the trigger URL from Render Dashboard → Triggers
@@ -275,7 +326,7 @@ python test_pipeline.py
 
 ## 🧬 Future Scope
 
-- 📈 Support for additional government schemes and certificates beyond the single fully-polished flow built for this hackathon (config-driven, so this is largely a JSON + template addition, not new orchestration code)
+- 📈 Support for additional government schemes and certificates beyond the three currently supported (PM Kisan, Caste Certificate, Income Certificate) — config-driven, so adding a new scheme is a JSON config + PDF template addition, not new orchestration code
 - 🛡️ Real telephony (PSTN) support so users without a smartphone/computer can access Setu via a phone call
 - 🌐 Broader language coverage across all 22 official Indian languages supported by Saaras, plus dialect robustness testing
 - 🔒 Basic document authenticity checks, to give users earlier warning of likely rejection before physical submission
